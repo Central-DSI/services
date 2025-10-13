@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: Backend API
+  version: 0.1.0
+  description: |
+    OpenAPI specification for the Backend API (Express + Prisma + Redis).
+
+    Notes:
+    - The current implementation includes minimal sample routes for /user and /notification.
+    - Error responses follow a unified JSON format from error.middleware.js.
+  contact:
+    name: API Support
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: System
+    description: System/health endpoints
+  - name: User
+    description: User sample endpoints
+  - name: Notification
+    description: Notification sample endpoints
+
+paths:
+  "/":
+    get:
+      tags: [System]
+      summary: API health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Health OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "API is running 🚀"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  "/user":
+    get:
+      tags: [User]
+      summary: Get sample users
+      operationId: getUsers
+      responses:
+        "200":
+          description: Sample list of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  route:
+                    type: string
+                  message:
+                    type: string
+                  sample:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserSample"
+              example:
+                route: "/user"
+                message: "User route is alive"
+                sample:
+                  - id: 1
+                    name: Alice
+                    email: alice@example.com
+                  - id: 2
+                    name: Bob
+                    email: bob@example.com
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [User]
+      summary: Create a sample user (echo)
+      operationId: createUser
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+            example:
+              name: Carol
+              email: carol@example.com
+      responses:
+        "201":
+          description: Echoes the received payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  route:
+                    type: string
+                  action:
+                    type: string
+                  received:
+                    type: object
+                    additionalProperties: true
+              example:
+                route: "/user"
+                action: "create"
+                received:
+                  name: Carol
+                  email: carol@example.com
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  "/user/{id}":
+    get:
+      tags: [User]
+      summary: Get sample user by id (echo)
+      operationId: getUserById
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: User id
+      responses:
+        "200":
+          description: Echoes the id received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  route:
+                    type: string
+                  id:
+                    type: string
+              example:
+                route: "/user/:id"
+                id: "1"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  "/notification":
+    get:
+      tags: [Notification]
+      summary: Get sample notifications
+      operationId: getNotifications
+      responses:
+        "200":
+          description: Sample list of notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  route:
+                    type: string
+                  message:
+                    type: string
+                  examples:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationSample"
+              example:
+                route: "/notification"
+                message: "Notification route is alive"
+                examples:
+                  - id: 1
+                    title: Welcome
+                    message: Hello there!
+                  - id: 2
+                    title: Reminder
+                    message: Don't forget to check in.
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [Notification]
+      summary: Create a sample notification (echo)
+      operationId: createNotification
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+            example:
+              title: Hello
+              message: World
+      responses:
+        "201":
+          description: Echoes the received payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  route:
+                    type: string
+                  action:
+                    type: string
+                  received:
+                    type: object
+                    additionalProperties: true
+              example:
+                route: "/notification"
+                action: "create"
+                received:
+                  title: Hello
+                  message: World
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  schemas:
+    UserSample:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    NotificationSample:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        status:
+          type: integer
+          example: 500
+        message:
+          type: string
+          example: Internal Server Error
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+          example: /user
+  responses:
+    InternalError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

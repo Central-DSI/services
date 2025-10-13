@@ -1,0 +1,58 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+# Other env variants (keep a sample like .env.example tracked)
+.env.*
+!.env.example
+
+# Prisma client output (custom path)
+/src/generated/prisma
+
+uploads/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Testing / coverage
+coverage
+.nyc_output
+
+# Build outputs / caches
+dist
+build
+.tmp
+tmp
+temp
+.cache
+.eslintcache
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Misc
+*.local
+*.swp
+*.swo
+
+# Notes:
+# - Do NOT ignore prisma/migrations; keep migrations under version control
+# - Keep lockfiles (pnpm-lock.yaml) committed for reproducible installs
