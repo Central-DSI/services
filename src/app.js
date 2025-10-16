@@ -31,24 +31,44 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const routesPath = path.join(__dirname, "routes");
 
-fs.readdirSync(routesPath).forEach(async (file) => {
-  if (file.endsWith(".route.js")) {
+try {
+  const routeFiles = fs
+    .readdirSync(routesPath)
+    .filter((f) => f.endsWith(".route.js"));
+  const mounted = [];
+  for (const file of routeFiles) {
     try {
       const routePath = path.join(routesPath, file);
-      // On Windows, dynamic import requires a file:// URL, not a raw absolute path
-      const routeUrl = pathToFileURL(routePath).href;
+      const routeUrl = pathToFileURL(routePath).href; // needed on Windows
       const routeModule = await import(routeUrl);
       const routeName = file.replace(".route.js", "");
+      if (!routeModule?.default) {
+        console.warn(`⚠️ Route file ${file} has no default export, skipping`);
+        continue;
+      }
       app.use(`/${routeName}`, routeModule.default);
+      mounted.push(`/${routeName}`);
       console.log(`🧭 Loaded route: /${routeName}`);
     } catch (err) {
-      console.error(`❌ Failed to load route file ${file}:`, err.message);
+      console.error(`❌ Failed to load route file ${file}:`, err.stack || err.message);
     }
   }
-});
+  console.log(`🧩 Routes mounted (${mounted.length}): ${mounted.join(", ") || "(none)"}`);
+} catch (e) {
+  console.error("❌ Failed scanning routes directory:", e.stack || e.message);
+}
 
 app.get("/", (req, res) => {
   res.json({ message: "API is running 🚀" });
+});
+
+// 404 logger → forward to error handler as JSON
+app.use((req, res, next) => {
+  const msg = `Route not found: ${req.method} ${req.originalUrl}`;
+  console.warn(`🛑 404 → ${msg}`);
+  const err = new Error(msg);
+  err.statusCode = 404;
+  next(err);
 });
 
 app.use(errorHandler);

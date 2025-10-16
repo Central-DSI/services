@@ -53,6 +53,8 @@ desktop.ini
 *.swp
 *.swo
 
+
+data
 # Notes:
 # - Do NOT ignore prisma/migrations; keep migrations under version control
 # - Keep lockfiles (pnpm-lock.yaml) committed for reproducible installs

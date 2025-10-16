@@ -74,11 +74,13 @@ model Student {
   enrollmentYear    Int?     @map("enrollment_year")
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   studentStatus     StudentStatus? @relation(fields: [studentStatusId], references: [id])
+  skscompleted      Int
   thesis            Thesis[]
   thesisProposal    ThesisProposal[]
   researchMethodGrades ResearchMethodGrade[]
   internships       Internship[]
   yudisiumApplicants YudisiumApplicant[]
+  
 
   @@map("students")
 }
