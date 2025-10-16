@@ -7,7 +7,7 @@ node_modules
 !.env.example
 
 # Prisma client output (custom path)
-/src/generated/prisma
+src/generated/prisma
 
 uploads/
 
