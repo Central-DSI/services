@@ -14,3 +14,799 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User Management
+model User {
+  id              Int      @id @default(autoincrement())
+  fullName        String   @map("full_name")
+  identityNumber  String   @unique @map("identity_number")
+  identityType    IdentityType @map("identity_type")
+  email           String?  @unique
+  password        String?
+  gender          Boolean?
+  phoneNumber     String?  @map("phone_number")
+  address         String?
+  token           String?
+  refreshToken    String?  @map("refresh_token")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  userHasRoles    UserHasRole[]
+  student         Student?
+  lecturer        Lecturer?
+  documents       Document[]
+  canvasFiles     CanvasFile[]
+  notifications   Notification[]
+  thesisActivityLogs ThesisActivityLog[]
+  thesisSeminarAudiences ThesisSeminarAudience[]
+  thesisSeminarRubric ThesisSeminarRubric[]
+  thesisDefenceRubrics ThesisDefenceRubric[]
+  internshipApprovals InternshipApproval[]
+  internshipSeminarBookingsRequester InternshipSeminarBooking[] @relation("InternshipSeminarBookingRequester")
+  internshipSeminarBookingsApprover InternshipSeminarBooking[] @relation("InternshipSeminarBookingApprover")
+
+  @@map("users")
+}
+
+model UserRole {
+  id          Int      @id @default(autoincrement())
+  name        String
+  userHasRoles UserHasRole[]
+
+  @@map("user_roles")
+}
+
+model UserHasRole {
+  userId    Int      @map("user_id")
+  roleId    Int      @map("role_id")
+  status    RoleStatus
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      UserRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_has_roles")
+}
+
+// Student Management
+model Student {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique @map("user_id")
+  studentStatusId   Int?     @map("student_status_id")
+  enrollmentYear    Int?     @map("enrollment_year")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentStatus     StudentStatus? @relation(fields: [studentStatusId], references: [id])
+  thesis            Thesis[]
+  thesisProposal    ThesisProposal[]
+  researchMethodGrades ResearchMethodGrade[]
+  internships       Internship[]
+  yudisiumApplicants YudisiumApplicant[]
+
+  @@map("students")
+}
+
+model StudentStatus {
+  id      Int      @id @default(autoincrement())
+  name    String
+  students Student[]
+
+  @@map("student_status")
+}
+
+// Lecturer Management
+model Lecturer {
+  id                    Int      @id @default(autoincrement())
+  userId                Int      @unique @map("user_id")
+  scienceGroupId        Int?     @map("science_group_id")
+  maxSupervisionQuota   Int      @default(8) @map("max_supervision_quota")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scienceGroup          ScienceGroup? @relation(fields: [scienceGroupId], references: [id])
+  thesisParticipants    ThesisParticipant[]
+  thesisGuidances       ThesisGuidance[]
+  thesisSeminarAudiences ThesisSeminarAudience[]
+  thesisSeminarScores   ThesisSeminarScore[]
+  thesisDefenceScores   ThesisDefenceScore[]
+  internshipSupervisors InternshipSupervisor[]
+  internshipGuidanceSchedules InternshipGuidanceSchedule[]
+
+  @@map("lecturers")
+}
+
+model ScienceGroup {
+  id        Int      @id @default(autoincrement())
+  name      String
+  lecturers Lecturer[]
+  thesisTopics ThesisTopic[]
+
+  @@map("science_groups")
+}
+
+// Academic Management
+model AcademicYear {
+  id        Int      @id @default(autoincrement())
+  semester  Semester @default(ganjil)
+  year      Int?
+  startDate DateTime? @map("start_date")
+  endDate   DateTime? @map("end_date")
+  thesis    Thesis[]
+  thesisSeminarRubric ThesisSeminarRubric[]
+  thesisDefenceRubrics ThesisDefenceRubric[]
+  internships Internship[]
+
+  @@map("academic_years")
+}
+
+model Room {
+  id                      Int      @id @default(autoincrement())
+  name                    String
+  thesisSeminarSchedules  ThesisSeminarSchedule[]
+  thesisDefenceSchedules  ThesisDefenceSchedule[]
+  yudisiumSchedules       YudisiumSchedule[]
+  internshipSeminarBookings InternshipSeminarBooking[]
+
+  @@map("rooms")
+}
+
+// Thesis Management
+model Thesis {
+  id                Int      @id @default(autoincrement())
+  studentId         Int      @map("student_id")
+  thesisTopicId     Int?     @map("thesis_topic_id")
+  thesisProposalId  Int?     @map("thesis_proposal_id")
+  thesisStatusId    Int?     @map("thesis_status_id")
+  academicYearId    Int?     @map("academic_year_id")
+  documentId        Int?     @map("document_id")
+  title             String?
+  startDate         DateTime? @map("start_date")
+  deadlineDate      DateTime? @map("deadline_date")
+  student           Student  @relation(fields: [studentId], references: [id])
+  thesisTopic       ThesisTopic? @relation(fields: [thesisTopicId], references: [id])
+  thesisProposal    ThesisProposal? @relation(fields: [thesisProposalId], references: [id])
+  thesisStatus      ThesisStatus? @relation(fields: [thesisStatusId], references: [id])
+  academicYear      AcademicYear? @relation(fields: [academicYearId], references: [id])
+  document          Document? @relation(fields: [documentId], references: [id])
+  thesisParticipants ThesisParticipant[]
+  thesisProgressCompletions ThesisProgressCompletion[]
+  thesisGuidances   ThesisGuidance[]
+  thesisActivityLogs ThesisActivityLog[]
+  thesisSeminars    ThesisSeminar[]
+  thesisDefences    ThesisDefence[]
+
+  @@map("thesis")
+}
+
+model ThesisParticipant {
+  id         Int      @id @default(autoincrement())
+  thesisId   Int      @map("thesis_id")
+  lecturerId Int      @map("lecturer_id")
+  role       ThesisRole
+  thesis     Thesis   @relation(fields: [thesisId], references: [id])
+  lecturer   Lecturer @relation(fields: [lecturerId], references: [id])
+
+  @@map("thesis_participants")
+}
+
+model ThesisTopic {
+  id              Int      @id @default(autoincrement())
+  name            String
+  scienceGroupId  Int?     @map("science_group_id")
+  scienceGroup    ScienceGroup? @relation(fields: [scienceGroupId], references: [id])
+  thesis          Thesis[]
+
+  @@map("thesis_topics")
+}
+
+model ThesisStatus {
+  id      Int      @id @default(autoincrement())
+  name    String
+  thesis  Thesis[]
+
+  @@map("thesis_status")
+}
+
+model ThesisProposal {
+  id         Int      @id @default(autoincrement())
+  studentId  Int      @map("student_id")
+  documentId Int?     @map("document_id")
+  status     ProposalStatus @default(submitted)
+  student    Student  @relation(fields: [studentId], references: [id])
+  document   Document? @relation(fields: [documentId], references: [id])
+  thesis     Thesis[]
+  thesisProposalGrades ThesisProposalGrade[]
+
+  @@map("thesis_proposal")
+}
+
+model ThesisProgressComponent {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  thesisProgressCompletions ThesisProgressCompletion[]
+
+  @@map("thesis_progress_components")
+}
+
+model ThesisProgressCompletion {
+  id                        Int      @id @default(autoincrement())
+  thesisId                  Int      @map("thesis_id")
+  componentId               Int      @map("component_id")
+  completedAt               DateTime? @map("completed_at")
+  validatedBySupervisor     Boolean  @default(false) @map("validated_by_supervisor")
+  thesis                    Thesis   @relation(fields: [thesisId], references: [id])
+  component                 ThesisProgressComponent @relation(fields: [componentId], references: [id])
+
+  @@map("thesis_progress_completions")
+}
+
+model ThesisGuidanceSchedule {
+  id          Int      @id @default(autoincrement())
+  guidanceDate DateTime? @map("guidance_date")
+  thesisGuidances ThesisGuidance[]
+
+  @@map("thesis_guidance_schedules")
+}
+
+model ThesisGuidance {
+  id                Int      @id @default(autoincrement())
+  thesisId          Int      @map("thesis_id")
+  scheduleId        Int?     @map("schedule_id")
+  supervisorId      Int?     @map("supervisor_id")
+  studentNotes      String?  @map("student_notes")
+  supervisorFeedback String? @map("supervisor_feedback")
+  meetingUrl        String?  @map("meeting_url")
+  status            GuidanceStatus @default(scheduled)
+  thesis            Thesis   @relation(fields: [thesisId], references: [id])
+  schedule          ThesisGuidanceSchedule? @relation(fields: [scheduleId], references: [id])
+  supervisor        Lecturer? @relation(fields: [supervisorId], references: [id])
+
+  @@map("thesis_guidances")
+}
+
+model ThesisActivityLog {
+  id        Int      @id @default(autoincrement())
+  thesisId  Int      @map("thesis_id")
+  userId    Int      @map("user_id")
+  activity  String
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  thesis    Thesis   @relation(fields: [thesisId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("thesis_activity_logs")
+}
+
+// Thesis Seminar Management
+model ThesisSeminar {
+  id        Int      @id @default(autoincrement())
+  thesisId  Int      @map("thesis_id")
+  scheduleId Int?    @map("schedule_id")
+  resultId  Int?     @map("result_id")
+  status    SeminarStatus @default(scheduled)
+  thesis    Thesis   @relation(fields: [thesisId], references: [id])
+  schedule  ThesisSeminarSchedule? @relation(fields: [scheduleId], references: [id])
+  result    ThesisSeminarResult? @relation(fields: [resultId], references: [id])
+  audiences ThesisSeminarAudience[]
+  scores    ThesisSeminarScore[]
+
+  @@map("thesis_seminars")
+}
+
+model ThesisSeminarSchedule {
+  id        Int      @id @default(autoincrement())
+  roomId    Int?     @map("room_id")
+  startTime DateTime @map("start_time")
+  endTime   DateTime @map("end_time")
+  status    ScheduleStatus @default(planned)
+  room      Room?    @relation(fields: [roomId], references: [id])
+  seminars  ThesisSeminar[]
+  internshipSeminars InternshipSeminar[]
+
+  @@map("thesis_seminar_schedules")
+}
+
+model ThesisSeminarResult {
+  id       Int      @id @default(autoincrement())
+  name     String
+  seminars ThesisSeminar[]
+  internshipSeminars InternshipSeminar[]
+
+  @@map("thesis_seminar_result")
+}
+
+model ThesisSeminarAudience {
+  id          Int      @id @default(autoincrement())
+  seminarId   Int      @map("seminar_id")
+  userId      Int      @map("user_id")
+  validatedBy Int?     @map("validated_by")
+  validatedAt DateTime? @map("validated_at")
+  seminar     ThesisSeminar @relation(fields: [seminarId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+  validator   Lecturer? @relation(fields: [validatedBy], references: [id])
+
+  @@map("thesis_seminar_audiences")
+}
+
+model ThesisSeminarRubric {
+  id              Int      @id @default(autoincrement())
+  academicYearId  Int?     @map("academic_year_id")
+  title           String?
+  createdBy       Int?     @map("created_by")
+  academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
+  creator         User?    @relation(fields: [createdBy], references: [id])
+  details         ThesisSeminarRubricDetail[]
+
+  @@map("thesis_seminar_rubric")
+}
+
+model ThesisSeminarRubricDetail {
+  id        Int      @id @default(autoincrement())
+  rubricId  Int      @map("rubric_id")
+  indicator String?
+  weight    Float?
+  rubric    ThesisSeminarRubric @relation(fields: [rubricId], references: [id])
+  scores    ThesisSeminarScore[]
+
+  @@map("thesis_seminar_rubric_details")
+}
+
+model ThesisSeminarScore {
+  id              Int      @id @default(autoincrement())
+  seminarId       Int      @map("seminar_id")
+  rubricDetailId  Int      @map("rubric_detail_id")
+  scoredBy        Int      @map("scored_by")
+  score           Int?
+  comment         String?
+  seminar         ThesisSeminar @relation(fields: [seminarId], references: [id])
+  rubricDetail    ThesisSeminarRubricDetail @relation(fields: [rubricDetailId], references: [id])
+  scorer          Lecturer @relation(fields: [scoredBy], references: [id])
+
+  @@map("thesis_seminar_scores")
+}
+
+// Thesis Defence Management
+model ThesisDefence {
+  id                      Int      @id @default(autoincrement())
+  thesisId                Int?     @map("thesis_id")
+  thesisDefenceScheduleId Int?     @map("thesis_defence_schedule_id")
+  thesisDefenceStatusId   Int?     @map("thesis_defence_status_id")
+  thesis                  Thesis?  @relation(fields: [thesisId], references: [id])
+  schedule                ThesisDefenceSchedule? @relation(fields: [thesisDefenceScheduleId], references: [id])
+  status                  ThesisDefenceStatus? @relation(fields: [thesisDefenceStatusId], references: [id])
+  scores                  ThesisDefenceScore[]
+
+  @@map("thesis_defences")
+}
+
+model ThesisDefenceSchedule {
+  id                  Int      @id @default(autoincrement())
+  roomId              Int?     @map("room_id")
+  startTime           DateTime? @map("start_time")
+  endTime             DateTime? @map("end_time")
+  status              DefenceScheduleStatus @default(planned)
+  supervisorApproval  Boolean? @map("supervisor_approval")
+  room                Room?    @relation(fields: [roomId], references: [id])
+  defences            ThesisDefence[]
+
+  @@map("thesis_defence_schedules")
+}
+
+model ThesisDefenceStatus {
+  id       Int      @id @default(autoincrement())
+  name     String?
+  defences ThesisDefence[]
+
+  @@map("thesis_defence_status")
+}
+
+model ThesisDefenceRubric {
+  id              Int      @id @default(autoincrement())
+  academicYearId  Int?     @map("academic_year_id")
+  title           String?
+  createdBy       Int?     @map("created_by")
+  academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
+  creator         User?    @relation(fields: [createdBy], references: [id])
+  details         ThesisDefenceRubricDetail[]
+
+  @@map("thesis_defence_rubrics")
+}
+
+model ThesisDefenceRubricDetail {
+  id        Int      @id @default(autoincrement())
+  rubricId  Int      @map("rubric_id")
+  indicator String?
+  weight    Float?
+  rubric    ThesisDefenceRubric @relation(fields: [rubricId], references: [id])
+  scores    ThesisDefenceScore[]
+
+  @@map("thesis_defence_rubric_details")
+}
+
+model ThesisDefenceScore {
+  id              Int      @id @default(autoincrement())
+  thesisDefenceId Int      @map("thesis_defence_id")
+  rubricDetailId  Int      @map("rubric_detail_id")
+  scoredBy        Int      @map("scored_by")
+  score           Int?
+  reviewerNote    String?  @map("reviewer_note")
+  defence         ThesisDefence @relation(fields: [thesisDefenceId], references: [id])
+  rubricDetail    ThesisDefenceRubricDetail @relation(fields: [rubricDetailId], references: [id])
+  scorer          Lecturer @relation(fields: [scoredBy], references: [id])
+
+  @@map("thesis_defence_scores")
+}
+
+// Yudisium Management
+model Yudisium {
+  id                Int      @id @default(autoincrement())
+  yudisiumScheduleId Int?    @map("yudisium_schedule_id")
+  yudisiumDecree    String?  @map("yudisium_decree")
+  schedule          YudisiumSchedule? @relation(fields: [yudisiumScheduleId], references: [id])
+  participants      YudisiumParticipant[]
+
+  @@map("yudisiums")
+}
+
+model YudisiumSchedule {
+  id                      Int      @id @default(autoincrement())
+  roomId                  Int?     @map("room_id")
+  schedule                DateTime?
+  status                  YudisiumStatus @default(planned)
+  departmentHeadApproval  Boolean? @map("department_head_approval")
+  room                    Room?    @relation(fields: [roomId], references: [id])
+  yudisiums               Yudisium[]
+
+  @@map("yudisium_schedules")
+}
+
+model YudisiumApplicant {
+  id                        Int      @id @default(autoincrement())
+  studentId                 Int      @map("student_id")
+  yudisiumApplicantStatusId Int?     @map("yudisium_applicant_status_id")
+  isEligible                Boolean? @map("is_eligible")
+  student                   Student  @relation(fields: [studentId], references: [id])
+  status                    YudisiumApplicantStatus? @relation(fields: [yudisiumApplicantStatusId], references: [id])
+  participants              YudisiumParticipant[]
+
+  @@map("yudisium_applicants")
+}
+
+model YudisiumApplicantStatus {
+  id        Int      @id @default(autoincrement())
+  name      String?
+  applicants YudisiumApplicant[]
+
+  @@map("yudisium_applicant_status")
+}
+
+model YudisiumParticipant {
+  id                  Int      @id @default(autoincrement())
+  yudisiumId          Int      @map("yudisium_id")
+  yudisiumApplicantId Int      @map("yudisium_applicant_id")
+  yudisium            Yudisium @relation(fields: [yudisiumId], references: [id])
+  applicant           YudisiumApplicant @relation(fields: [yudisiumApplicantId], references: [id])
+
+  @@map("yudisium_participants")
+}
+
+// Document Management
+model Document {
+  id              Int      @id @default(autoincrement())
+  userId          Int?     @map("user_id")
+  documentTypeId  Int?     @map("document_type_id")
+  filePath        String?  @map("file_path")
+  fileName        String?  @map("file_name")
+  user            User?    @relation(fields: [userId], references: [id])
+  documentType    DocumentType? @relation(fields: [documentTypeId], references: [id])
+  canvasFiles     CanvasFile[]
+  thesis          Thesis[]
+  thesisProposal  ThesisProposal[]
+  internships     Internship[] @relation("InternshipReportDocument")
+  internshipProposals Internship[] @relation("InternshipProposalDocument")
+  internshipCertificates Internship[] @relation("InternshipCertificateDocument")
+  internshipAssessments InternshipAssessment[]
+
+  @@map("documents")
+}
+
+model DocumentType {
+  id        Int      @id @default(autoincrement())
+  name      String?
+  documents Document[]
+
+  @@map("document_types")
+}
+
+model DocumentTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String?
+  filePath  String?  @map("file_path")
+
+  @@map("document_templates")
+}
+
+model CanvasFile {
+  id          Int      @id @default(autoincrement())
+  documentId  Int?     @map("document_id")
+  userId      Int?     @map("user_id")
+  annotations Json?
+  version     Int?
+  document    Document? @relation(fields: [documentId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@map("canvas_files")
+}
+
+// Notification Management
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String?
+  message   String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+// Grade Management
+model ThesisProposalGrade {
+  id        Int      @id @default(autoincrement())
+  proposalId Int?    @map("proposal_id")
+  grade     Int?
+  proposal  ThesisProposal? @relation(fields: [proposalId], references: [id])
+
+  @@map("thesis_proposal_grades")
+}
+
+model ResearchMethodGrade {
+  id        Int      @id @default(autoincrement())
+  studentId Int?     @map("student_id")
+  grade     Int?
+  student   Student? @relation(fields: [studentId], references: [id])
+
+  @@map("research_method_grades")
+}
+
+// Internship Management
+model Internship {
+  id                      Int      @id @default(autoincrement())
+  studentId               Int      @map("student_id")
+  companyName             String   @map("company_name")
+  companyAddress          String?  @map("company_address")
+  fieldSupervisor         String?  @map("field_supervisor")
+  fieldSupervisorPhone    String?  @map("field_supervisor_phone")
+  startDate               DateTime @map("start_date")
+  endDate                 DateTime @map("end_date")
+  status                  InternshipStatus @default(ongoing)
+  reportDocumentId        Int?     @map("report_document_id")
+  proposalDocumentId      Int?     @map("proposal_document_id")
+  certificateDocumentId   Int?     @map("certificate_document_id")
+  academicYearId          Int?     @map("academic_year_id")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
+  student                 Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  reportDocument          Document? @relation("InternshipReportDocument", fields: [reportDocumentId], references: [id])
+  proposalDocument        Document? @relation("InternshipProposalDocument", fields: [proposalDocumentId], references: [id])
+  certificateDocument     Document? @relation("InternshipCertificateDocument", fields: [certificateDocumentId], references: [id])
+  academicYear            AcademicYear? @relation(fields: [academicYearId], references: [id])
+  supervisors             InternshipSupervisor[]
+  reports                 InternshipReport[]
+  assessments             InternshipAssessment[]
+  seminars                InternshipSeminar[]
+  approvals               InternshipApproval[]
+  guidanceSchedules       InternshipGuidanceSchedule[]
+  seminarBookings         InternshipSeminarBooking[]
+
+  @@index([studentId], map: "idx_internships_student")
+  @@map("internships")
+}
+
+model InternshipSupervisor {
+  id                      Int      @id @default(autoincrement())
+  internshipId            Int      @map("internship_id")
+  lecturerId              Int?     @map("lecturer_id")
+  externalSupervisorName  String?  @map("external_supervisor_name")
+  role                    SupervisorRole
+  internship              Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  lecturer                Lecturer? @relation(fields: [lecturerId], references: [id])
+
+  @@map("internship_supervisors")
+}
+
+model InternshipReport {
+  id                      Int      @id @default(autoincrement())
+  internshipId            Int      @map("internship_id")
+  entryDate               DateTime @map("entry_date")
+  activityDescription     String?  @map("activity_description")
+  validatedBySupervisor   Boolean  @default(false) @map("validated_by_supervisor")
+  createdAt               DateTime @default(now()) @map("created_at")
+  internship              Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+
+  @@index([internshipId], map: "idx_internship_reports_internship")
+  @@map("internship_reports")
+}
+
+model InternshipAssessment {
+  id                      Int      @id @default(autoincrement())
+  internshipId            Int      @map("internship_id")
+  assessorType            AssessorType
+  assessorId              Int?     @map("assessor_id")
+  score                   Float?
+  comments                String?
+  rawImageDocumentId      Int?     @map("raw_image_document_id")
+  ocrText                 String?  @map("ocr_text")
+  createdAt               DateTime @default(now()) @map("created_at")
+  internship              Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  rawImageDocument        Document? @relation(fields: [rawImageDocumentId], references: [id])
+
+  @@index([internshipId], map: "idx_internship_assessments_internship")
+  @@map("internship_assessments")
+}
+
+model InternshipSeminar {
+  id          Int      @id @default(autoincrement())
+  internshipId Int     @map("internship_id")
+  scheduleId  Int?     @map("schedule_id")
+  resultId    Int?     @map("result_id")
+  status      SeminarStatus @default(scheduled)
+  internship  Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  schedule    ThesisSeminarSchedule? @relation(fields: [scheduleId], references: [id])
+  result      ThesisSeminarResult? @relation(fields: [resultId], references: [id])
+
+  @@map("internship_seminars")
+}
+
+model InternshipApproval {
+  id          Int      @id @default(autoincrement())
+  internshipId Int     @map("internship_id")
+  approvedBy  Int?     @map("approved_by")
+  role        ApprovalRole
+  status      ApprovalStatus @default(pending)
+  notes       String?
+  approvedAt  DateTime? @map("approved_at")
+  internship  Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  approver    User?    @relation(fields: [approvedBy], references: [id])
+
+  @@map("internship_approvals")
+}
+
+model InternshipGuidanceSchedule {
+  id              Int      @id @default(autoincrement())
+  internshipId    Int      @map("internship_id")
+  lecturerId      Int      @map("lecturer_id")
+  meetingDate     DateTime @map("meeting_date")
+  status          GuidanceScheduleStatus @default(requested)
+  studentNotes    String?  @map("student_notes")
+  lecturerFeedback String? @map("lecturer_feedback")
+  createdAt       DateTime @default(now()) @map("created_at")
+  internship      Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  lecturer        Lecturer @relation(fields: [lecturerId], references: [id])
+
+  @@map("internship_guidance_schedules")
+}
+
+model InternshipSeminarBooking {
+  id          Int      @id @default(autoincrement())
+  internshipId Int     @map("internship_id")
+  roomId      Int      @map("room_id")
+  requestedBy Int      @map("requested_by")
+  approvedBy  Int?     @map("approved_by")
+  status      BookingStatus @default(requested)
+  requestedAt DateTime @default(now()) @map("requested_at")
+  approvedAt  DateTime? @map("approved_at")
+  internship  Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  room        Room     @relation(fields: [roomId], references: [id])
+  requester   User     @relation("InternshipSeminarBookingRequester", fields: [requestedBy], references: [id])
+  approver    User?    @relation("InternshipSeminarBookingApprover", fields: [approvedBy], references: [id])
+
+  @@index([roomId], map: "idx_internship_seminar_bookings_room")
+  @@map("internship_seminar_bookings")
+}
+
+// Enums
+enum IdentityType {
+  NIM
+  NIP
+  OTHER
+}
+
+enum RoleStatus {
+  active
+  nonActive
+}
+
+enum Semester {
+  ganjil
+  genap
+}
+
+enum ThesisRole {
+  SUPERVISOR_1
+  SUPERVISOR_2
+  EXAMINER_1
+  EXAMINER_2
+  EXAMINER_3
+  MODERATOR
+}
+
+enum ProposalStatus {
+  submitted
+  accepted
+  rejected
+}
+
+enum GuidanceStatus {
+  scheduled
+  completed
+  cancelled
+}
+
+enum SeminarStatus {
+  scheduled
+  rescheduled
+  ongoing
+  completed
+  cancelled
+}
+
+enum ScheduleStatus {
+  planned
+  rescheduled
+  finalized
+}
+
+enum DefenceScheduleStatus {
+  planned
+  scheduled
+  finalized
+  cancelled
+}
+
+enum YudisiumStatus {
+  planned
+  finalized
+  completed
+}
+
+enum InternshipStatus {
+  ongoing
+  completed
+  cancelled
+}
+
+enum SupervisorRole {
+  LECTURER
+  FIELD_SUPERVISOR
+}
+
+enum AssessorType {
+  LECTURER
+  FIELD_SUPERVISOR
+}
+
+enum ApprovalRole {
+  SECRETARY
+  ADMIN
+  LECTURER
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum GuidanceScheduleStatus {
+  requested
+  approved
+  completed
+  cancelled
+}
+
+enum BookingStatus {
+  requested
+  approved
+  cancelled
+  completed
+}
+
