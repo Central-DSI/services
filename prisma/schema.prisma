@@ -22,9 +22,8 @@ model User {
   identityType    IdentityType @map("identity_type")
   email           String?  @unique
   password        String?
-  gender          Boolean?
   phoneNumber     String?  @map("phone_number")
-  address         String?
+  isVerified      Boolean  @default(false)
   token           String?
   refreshToken    String?  @map("refresh_token")
   createdAt       DateTime @default(now())
