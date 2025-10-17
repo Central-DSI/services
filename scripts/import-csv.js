@@ -65,7 +65,8 @@ async function run(fileOverride) {
   const activeStatus = await getOrCreateStudentStatus("Aktif");
   const studentRole = await getOrCreateRole("student");
 
-  let success = 0;
+  let created = 0;
+  let updated = 0;
   let skipped = 0;
   let failed = 0;
 
@@ -82,50 +83,83 @@ async function run(fileOverride) {
       continue;
     }
 
-    const exists = await prisma.user.findFirst({
+    const existingUser = await prisma.user.findFirst({
       where: { OR: [{ identityNumber: nim }, { email }] },
       select: { id: true },
     });
-
-    if (exists) {
-      skipped++;
-      console.warn(`⏭️ User sudah ada, skip: ${nim} / ${email}`);
-      continue;
-    }
 
     try {
       const passwordHash = await bcrypt.hash(plainPassword, 10);
       const phoneNumber = row.phoneNumber || `08${Math.floor(100000000 + Math.random() * 900000000)}`;
 
-      const user = await prisma.user.create({
-        data: {
-          fullName: name,
-          identityNumber: nim,
-          identityType: "NIM",
-          email,
-          password: passwordHash,
-          phoneNumber,
-          isVerified: true,
-          userHasRoles: {
-            create: {
+      if (!existingUser) {
+        // Create new user + role + student
+        const user = await prisma.user.create({
+          data: {
+            fullName: name,
+            identityNumber: nim,
+            identityType: "NIM",
+            email,
+            password: passwordHash,
+            phoneNumber,
+            isVerified: true,
+            userHasRoles: {
+              create: {
+                role: { connect: { id: studentRole.id } },
+                status: "active",
+              },
+            },
+          },
+        });
+
+        await prisma.student.create({
+          data: {
+            userId: user.id,
+            studentStatusId: activeStatus.id,
+            enrollmentYear: angkatan,
+            skscompleted: randSks(70, 131),
+          },
+        });
+
+        created++;
+        console.log(`✅ Created user+student: ${name} (${nim})`);
+      } else {
+        // Ensure role 'student' exists for this user
+        const hasRole = await prisma.userHasRole.findFirst({
+          where: { userId: existingUser.id, roleId: studentRole.id },
+          select: { userId: true },
+        });
+        if (!hasRole) {
+          await prisma.userHasRole.create({
+            data: {
+              user: { connect: { id: existingUser.id } },
               role: { connect: { id: studentRole.id } },
               status: "active",
             },
-          },
-        },
-      });
+          });
+          console.log(`🔗 Added role 'student' to user ${nim}`);
+        }
 
-      await prisma.student.create({
-        data: {
-          userId: user.id,
-          studentStatusId: activeStatus.id,
-          enrollmentYear: angkatan,
-          skscompleted: randSks(70, 131),
-        },
-      });
+        // Ensure Student record exists
+        const existingStudent = await prisma.student.findUnique({
+          where: { userId: existingUser.id },
+          select: { id: true },
+        });
+        if (!existingStudent) {
+          await prisma.student.create({
+            data: {
+              userId: existingUser.id,
+              studentStatusId: activeStatus.id,
+              enrollmentYear: angkatan,
+              skscompleted: randSks(70, 131),
+            },
+          });
+          console.log(`🧩 Created Student row for ${nim}`);
+        }
 
-      success++;
-      console.log(`✅ ${name} (${nim}) berhasil dimigrasi`);
+        updated++;
+        console.log(`♻️ Ensured role/student for existing user: ${name} (${nim})`);
+      }
     } catch (err) {
       failed++;
       console.error(`❌ Gagal insert ${name} (${nim}): ${err.message}`);
@@ -133,7 +167,8 @@ async function run(fileOverride) {
   }
 
   console.log(`\n📦 Ringkasan migrasi:`);
-  console.log(`  ✅ Berhasil : ${success}`);
+  console.log(`  ✅ Dibuat   : ${created}`);
+  console.log(`  ♻️ Diupdate : ${updated}`);
   console.log(`  ⏭️ Dilewati: ${skipped}`);
   console.log(`  ❌ Gagal    : ${failed}`);
 }

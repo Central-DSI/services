@@ -81,39 +81,48 @@ paths:
 
     post:
       tags: [User]
-      summary: Create a sample user (echo)
-      operationId: createUser
+      summary: Admin - Create user and assign roles
+      description: |
+        Create a new user account and assign roles. This endpoint is restricted to administrators.
+        Notes:
+        - The 'admin' role cannot be assigned via this endpoint and will be ignored if provided.
+        - The system generates a temporary password and emails it to the user along with a verification link.
+      operationId: adminCreateUser
+      security:
+        - bearerAuth: []
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
+              $ref: "#/components/schemas/CreateUserRequest"
             example:
-              name: Carol
-              email: carol@example.com
+              fullName: "Budi Santoso"
+              email: "budi@example.com"
+              roles: ["student", "pembimbing 1"]
+              identityNumber: "2211529999"
+              identityType: "NIM"
       responses:
         "201":
-          description: Echoes the received payload
+          description: User created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  route:
-                    type: string
-                  action:
-                    type: string
-                  received:
-                    type: object
-                    additionalProperties: true
+                $ref: "#/components/schemas/CreateUserResponse"
               example:
-                route: "/user"
-                action: "create"
-                received:
-                  name: Carol
-                  email: carol@example.com
+                message: "User created"
+                user:
+                  id: "uuid"
+                  email: "budi@example.com"
+                  roles: ["student", "pembimbing 1"]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -178,6 +187,44 @@ paths:
                   - id: 2
                     title: Reminder
                     message: Don't forget to check in.
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [Notification]
+      summary: Create a sample notification (echo)
+      operationId: createNotification
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+            example:
+              title: Hello
+              message: World
+      responses:
+        "201":
+          description: Echoes the received payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  route:
+                    type: string
+                  action:
+                    type: string
+                  received:
+                    type: object
+                    additionalProperties: true
+              example:
+                route: "/notification"
+                action: "create"
+                received:
+                  title: Hello
+                  message: World
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -462,6 +509,43 @@ paths:
 
 components:
   schemas:
+    CreateUserRequest:
+      type: object
+      required: [email]
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        roles:
+          type: array
+          items:
+            type: string
+          description: Roles to assign to the new user ("admin" will be ignored)
+        identityNumber:
+          type: string
+        identityType:
+          type: string
+          enum: [NIM, NIP, OTHER]
+    CreateUserResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+              format: email
+            roles:
+              type: array
+              items:
+                type: string
+  
     LoginRequest:
       type: object
       required: [email, password]
@@ -562,6 +646,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     InternalError:
       description: Internal Server Error
       content:
@@ -570,6 +660,12 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     Unauthorized:
       description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict
       content:
         application/json:
           schema:

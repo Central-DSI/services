@@ -98,7 +98,6 @@ model Lecturer {
   id                    String   @id @default(uuid())
   userId                String   @unique @map("user_id")
   scienceGroupId        String?  @map("science_group_id")
-  maxSupervisionQuota   Int      @default(8) @map("max_supervision_quota")
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   scienceGroup          ScienceGroup? @relation(fields: [scienceGroupId], references: [id])
   thesisParticipants    ThesisParticipant[]

@@ -1,33 +1,19 @@
 import express from "express";
+import { authGuard, requireRole } from "../middlewares/auth.middleware.js";
+import { createUserByAdmin } from "../controllers/user.controller.js";
+import { validate } from "../middlewares/validation.middleware.js";
+import { createUserSchema } from "../validators/user.validator.js";
 
 const router = express.Router();
 
-// GET /user/
+// Health/info endpoint
 router.get("/", (req, res) => {
 	res.json({
 		route: "/user",
 		message: "User route is alive",
-		sample: [
-			{ id: 1, name: "Alice", email: "alice@example.com" },
-			{ id: 2, name: "Bob", email: "bob@example.com" },
-		],
 	});
 });
 
-// GET /user/:id
-router.get("/:id", (req, res) => {
-	const { id } = req.params;
-	res.json({ route: "/user/:id", id });
-});
-
-// POST /user/
-router.post("/", (req, res) => {
-	const payload = req.body || {};
-	res.status(201).json({
-		route: "/user",
-		action: "create",
-		received: payload,
-	});
-});
+router.post("/", authGuard, requireRole("admin"), validate(createUserSchema), createUserByAdmin);
 
 export default router;

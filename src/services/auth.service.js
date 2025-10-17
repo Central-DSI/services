@@ -185,3 +185,28 @@ export async function resetPasswordWithToken(token, newPassword) {
 	await prisma.user.update({ where: { id: decoded.sub }, data: { refreshToken: null } });
 }
 
+// -----------------------------
+// Account Verification via Email
+// -----------------------------
+export async function verifyAccountToken(token) {
+	try {
+		const decoded = jwt.verify(token, ENV.JWT_SECRET);
+		if (decoded.purpose !== "verify") throw new Error("Invalid token");
+		const key = `verify:${decoded.sub}`;
+		if (!redisClient.isOpen) await redisClient.connect();
+		const exists = await redisClient.get(key);
+		if (!exists) {
+			const err = new Error("Token expired or already used");
+			err.statusCode = 400;
+			throw err;
+		}
+		await prisma.user.update({ where: { id: decoded.sub }, data: { isVerified: true } });
+		await redisClient.del(key);
+		return { userId: decoded.sub };
+	} catch (e) {
+		const err = new Error("Invalid or expired token");
+		err.statusCode = 400;
+		throw err;
+	}
+}
+

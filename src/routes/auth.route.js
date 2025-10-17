@@ -1,5 +1,5 @@
 import express from "express";
-import { login, refresh, me, doLogout, changePasswordHandler, forgotPassword, verifyResetToken, resetPassword } from "../controllers/auth.controller.js";
+import { login, refresh, me, doLogout, changePasswordHandler, forgotPassword, verifyResetToken, resetPassword, verifyAccount } from "../controllers/auth.controller.js";
 import { authGuard, refreshGuard } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
@@ -23,6 +23,9 @@ router.patch("/password", authGuard, changePasswordHandler);
 router.post("/reset/request", forgotPassword);
 router.get("/reset/verify", verifyResetToken);
 router.post("/reset/confirm", resetPassword);
+
+// Account verification
+router.get("/verify", verifyAccount);
 
 export default router;
 
