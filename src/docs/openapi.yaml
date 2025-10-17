@@ -23,6 +23,8 @@ tags:
     description: Notification sample endpoints
   - name: Auth
     description: Authentication endpoints (JWT access + refresh)
+  - name: AdminFeatures
+    description: Admin-only utilities and maintenance endpoints
 
 paths:
   "/":
@@ -469,43 +471,90 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  "/adminfeatures/students/import":
     post:
-      tags: [Notification]
-      summary: Create a sample notification (echo)
-      operationId: createNotification
+      tags: [AdminFeatures]
+      summary: Admin - Import students from CSV
+      description: |
+        Upload a CSV to import student accounts.
+        - Required headers: nim, nama, email
+        - Optional header: sks_completed
+        - Rows with existing email are skipped (no updates)
+        - New users are created with password=null and isVerified=false
+        - Assigns role "student" and creates Student with enrollmentYear derived from NIM
+        - Supports separator "," or ";" automatically
+      operationId: adminImportStudentsCsv
+      security:
+        - bearerAuth: []
       requestBody:
-        required: false
+        required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              additionalProperties: true
-            example:
-              title: Hello
-              message: World
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              file:
+                contentType: text/csv
       responses:
-        "201":
-          description: Echoes the received payload
+        "200":
+          description: Import summary
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  route:
-                    type: string
-                  action:
-                    type: string
-                  received:
-                    type: object
-                    additionalProperties: true
-              example:
-                route: "/notification"
-                action: "create"
-                received:
-                  title: Hello
-                  message: World
+                  success:
+                    type: boolean
+                    example: true
+                  summary:
+                    $ref: "#/components/schemas/ImportStudentsSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
+
+  "/auth/verify/request":
+    post:
+      tags: [Auth]
+      summary: Request account activation email
+      description: |
+        User-initiated account activation. If the email exists and is not verified, the server sends an activation link to the email.
+        If the account does not yet have a password, a temporary password will be generated and included in the email.
+        The response is always success to avoid email enumeration.
+      operationId: requestAccountActivation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+            example:
+              email: user@example.com
+      responses:
+        "200":
+          description: Request accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
 
 components:
   schemas:
@@ -621,6 +670,21 @@ components:
           type: string
         message:
           type: string
+    ImportStudentsSummary:
+      type: object
+      properties:
+        created:
+          type: integer
+          example: 10
+        updated:
+          type: integer
+          example: 0
+        skipped:
+          type: integer
+          example: 5
+        failed:
+          type: integer
+          example: 1
     ErrorResponse:
       type: object
       properties:

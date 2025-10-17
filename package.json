@@ -10,7 +10,9 @@
     "dev": "nodemon src/server.js",
     "seed": "prisma db seed",
     "import:students": "node scripts/import-csv.js",
-    "import:lecturers": "node scripts/import-lecturers.js"
+    "import:lecturers": "node scripts/import-lecturers.js",
+    "fix:sks": "node scripts/fill-sks.js",
+    "fix:student-status": "node scripts/fill-student-status.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -21,6 +23,7 @@
   "dependencies": {
     "@prisma/client": "^6.17.1",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.61.0",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.3",

@@ -1,6 +1,7 @@
 import app from "./app.js";
 import { ENV } from "./config/env.js";
 import { initConnections } from "./config/db.js";
+// removed password queue worker; using user-initiated account activation instead
 
 const PORT = ENV.PORT || 3000;
 

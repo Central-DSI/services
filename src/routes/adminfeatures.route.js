@@ -8,5 +8,7 @@ const router = express.Router();
 // POST /adminfeatures/students/import (CSV: nim,nama,email)
 router.post("/students/import", authGuard, requireRole("admin"), uploadCsv, importStudentsCsv);
 
+// (removed) admin password broadcast feature
+
 export default router;
 

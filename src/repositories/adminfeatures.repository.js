@@ -43,11 +43,11 @@ export function ensureUserRole(userId, roleId) {
 	});
 }
 
-export function ensureStudent(userId, enrollmentYear = null) {
+export function ensureStudent(userId, enrollmentYear = null, skscompleted = 0) {
 	return prisma.student.upsert({
 		where: { userId },
 		update: {},
-		create: { userId, enrollmentYear, skscompleted: 0 },
+		create: { userId, enrollmentYear, skscompleted: Number.isInteger(skscompleted) && skscompleted >= 0 ? skscompleted : 0 },
 	});
 }
 

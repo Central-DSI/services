@@ -14,10 +14,12 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
+// Resolve __filename/__dirname once
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Swagger UI (serve OpenAPI spec at /docs)
 try {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
   const openapiPath = path.join(__dirname, "docs", "openapi.yaml");
   const openapiSpec = YAML.load(openapiPath);
   app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
@@ -27,8 +29,6 @@ try {
 }
 
 // Auto register semua routes di /routes
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const routesPath = path.join(__dirname, "routes");
 
 try {

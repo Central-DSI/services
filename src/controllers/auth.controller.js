@@ -1,4 +1,4 @@
-import { loginWithEmailPassword, refreshTokens, logout, verifyAccessToken, changePassword, requestPasswordReset, verifyPasswordResetToken, resetPasswordWithToken, verifyAccountToken } from "../services/auth.service.js";
+import { loginWithEmailPassword, refreshTokens, logout, verifyAccessToken, changePassword, requestPasswordReset, verifyPasswordResetToken, resetPasswordWithToken, verifyAccountToken, requestAccountVerification } from "../services/auth.service.js";
 
 export async function login(req, res, next) {
 	try {
@@ -114,6 +114,21 @@ export async function verifyAccount(req, res, next) {
 		}
 		const result = await verifyAccountToken(token);
 		res.json({ success: true, verified: true, userId: result.userId });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function requestAccountVerificationController(req, res, next) {
+	try {
+		const { email } = req.body || {};
+		if (!email) {
+			const err = new Error("Email is required");
+			err.statusCode = 400;
+			throw err;
+		}
+		await requestAccountVerification(email);
+		res.json({ success: true });
 	} catch (err) {
 		next(err);
 	}
