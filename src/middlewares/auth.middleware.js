@@ -83,3 +83,33 @@ export function requireRole(roleName) {
 	};
 }
 
+// Require that the authenticated user has ANY of the provided roles.
+// Role name comparison is case-insensitive and ignores spaces/underscores.
+export function requireAnyRole(roleNames = []) {
+	const normalize = (s) => String(s || "").toLowerCase().replace(/\s|_/g, "");
+	const expected = new Set(roleNames.map(normalize));
+	return async function (req, res, next) {
+		try {
+			const userId = req.user?.sub;
+			if (!userId) {
+				const err = new Error("Unauthorized");
+				err.statusCode = 401;
+				throw err;
+			}
+			const assignments = await prisma.userHasRole.findMany({
+				where: { userId, status: "active" },
+				select: { role: { select: { name: true } } },
+			});
+			const hasAny = assignments.some((a) => expected.has(normalize(a.role?.name)));
+			if (!hasAny) {
+				const err = new Error("Forbidden: insufficient role");
+				err.statusCode = 403;
+				throw err;
+			}
+			next();
+		} catch (err) {
+			next(err);
+		}
+	};
+}
+

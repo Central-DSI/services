@@ -18,6 +18,33 @@ function parseArgs() {
   return out;
 }
 
+function canonicalizeStatusName(input) {
+  if (!input) return 'Aktif';
+  const v = String(input).trim().toLowerCase().replace(/\s+/g, ' ');
+  if (v === 'aktif' || v === 'active') return 'Aktif';
+  if (v === 'non aktif' || v === 'nonaktif' || v === 'inactive') return 'Non Aktif';
+  if (v === 'drop out' || v === 'dropout' || v === 'drop-out') return 'Drop Out';
+  // fallback to capitalized original
+  return input;
+}
+
+async function ensureStatus(name) {
+  const existing = await prisma.studentStatus.findFirst({ where: { name } });
+  if (existing) return existing;
+  const created = await prisma.studentStatus.create({ data: { name } });
+  console.log(`Created StudentStatus: ${name}`);
+  return created;
+}
+
+async function ensureDefaultStatuses() {
+  // Seed a minimal set of statuses if they don't exist
+  const needed = ['Aktif', 'Non Aktif', 'Drop Out'];
+  for (const n of needed) {
+    // eslint-disable-next-line no-await-in-loop
+    await ensureStatus(n);
+  }
+}
+
 async function getTargetStatus({ id, name }) {
   if (id) {
     const status = await prisma.studentStatus.findFirst({ where: { id } });
@@ -31,9 +58,13 @@ async function getTargetStatus({ id, name }) {
 
 async function main() {
   const args = parseArgs();
-  console.log(`Setting studentStatusId=null -> '${args.id ? args.id : args.name}'...`);
+  const targetName = args.id ? undefined : canonicalizeStatusName(args.name);
+  console.log(`Setting studentStatusId=null -> '${args.id ? args.id : targetName}'...`);
 
-  const target = await getTargetStatus(args);
+  // Ensure baseline statuses exist
+  await ensureDefaultStatuses();
+
+  const target = await getTargetStatus({ id: args.id, name: targetName });
 
   // Find students with null status
   const students = await prisma.student.findMany({

@@ -51,6 +51,11 @@ model UserRole {
   id          String   @id @default(uuid())
   name        String
   userHasRoles UserHasRole[]
+  // Back-relations for role_id references
+  thesisParticipants     ThesisParticipant[]
+  internshipSupervisors  InternshipSupervisor[]
+  internshipAssessments  InternshipAssessment[]
+  internshipApprovals    InternshipApproval[]
 
   @@map("user_roles")
 }
@@ -178,9 +183,10 @@ model ThesisParticipant {
   id         String   @id @default(uuid())
   thesisId   String   @map("thesis_id")
   lecturerId String   @map("lecturer_id")
-  role       ThesisRole
+  roleId     String   @map("role_id")
   thesis     Thesis   @relation(fields: [thesisId], references: [id])
   lecturer   Lecturer @relation(fields: [lecturerId], references: [id])
+  role       UserRole @relation(fields: [roleId], references: [id])
 
   @@map("thesis_participants")
 }
@@ -606,9 +612,10 @@ model InternshipSupervisor {
   internshipId            String   @map("internship_id")
   lecturerId              String?  @map("lecturer_id")
   externalSupervisorName  String?  @map("external_supervisor_name")
-  role                    SupervisorRole
+  roleId                  String   @map("role_id")
   internship              Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
   lecturer                Lecturer? @relation(fields: [lecturerId], references: [id])
+  role                    UserRole  @relation(fields: [roleId], references: [id])
 
   @@map("internship_supervisors")
 }
@@ -629,7 +636,7 @@ model InternshipReport {
 model InternshipAssessment {
   id                      String   @id @default(uuid())
   internshipId            String   @map("internship_id")
-  assessorType            AssessorType
+  assessorRoleId          String?  @map("assessor_role_id")
   assessorId              String?  @map("assessor_id")
   score                   Float?
   comments                String?
@@ -638,6 +645,7 @@ model InternshipAssessment {
   createdAt               DateTime @default(now()) @map("created_at")
   internship              Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
   rawImageDocument        Document? @relation(fields: [rawImageDocumentId], references: [id])
+  assessorRole            UserRole? @relation(fields: [assessorRoleId], references: [id])
 
   @@index([internshipId], map: "idx_internship_assessments_internship")
   @@map("internship_assessments")
@@ -660,12 +668,13 @@ model InternshipApproval {
   id          String   @id @default(uuid())
   internshipId String  @map("internship_id")
   approvedBy  String?  @map("approved_by")
-  role        ApprovalRole
+  roleId      String?  @map("role_id")
   status      ApprovalStatus @default(pending)
   notes       String?
   approvedAt  DateTime? @map("approved_at")
   internship  Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
   approver    User?    @relation(fields: [approvedBy], references: [id])
+  role        UserRole? @relation(fields: [roleId], references: [id])
 
   @@map("internship_approvals")
 }
@@ -720,14 +729,6 @@ enum Semester {
   genap
 }
 
-enum ThesisRole {
-  SUPERVISOR_1
-  SUPERVISOR_2
-  EXAMINER_1
-  EXAMINER_2
-  EXAMINER_3
-  MODERATOR
-}
 
 enum ProposalStatus {
   submitted
@@ -774,21 +775,7 @@ enum InternshipStatus {
   cancelled
 }
 
-enum SupervisorRole {
-  LECTURER
-  FIELD_SUPERVISOR
-}
-
-enum AssessorType {
-  LECTURER
-  FIELD_SUPERVISOR
-}
-
-enum ApprovalRole {
-  SECRETARY
-  ADMIN
-  LECTURER
-}
+// Removed enums SupervisorRole, AssessorType, ApprovalRole in favor of user_roles relation via role_id
 
 enum ApprovalStatus {
   pending

@@ -48,13 +48,18 @@ function mapScienceGroupName(raw) {
 }
 
 function normalizeRoleName(raw) {
-  const v = cleanStr(raw).toLowerCase();
+  const v = cleanStr(raw).toLowerCase().replace(/\s+/g, " ");
   if (!v) return null;
-  // unifying common variants
-  if (v.startsWith("pembimbing")) return "pembimbing"; // pembimbing, pembimbing 1/2
+  // Preserve numbered supervisor roles
+  if (v === "pembimbing1" || v === "pembimbing 1") return "pembimbing1";
+  if (v === "pembimbing2" || v === "pembimbing 2") return "pembimbing2";
+  // If generic 'pembimbing' is provided, default to pembimbing1 (warn once per run is optional)
+  if (v === "pembimbing") {
+    return "pembimbing1";
+  }
   if (v === "penguji") return "penguji";
-  if (v === "sekdep" || v === "sekretaris departemen" || v === "sekretaris_departemen")
-    return "sekretaris_departemen";
+  // Canonicalize secretary dept role to 'sekdep' (accept a few variants)
+  if (v === "sekdep" || v === "sekretaris departemen" || v === "sekretaris_departemen") return "sekdep";
   if (v === "kadep") return "kadep";
   if (v === "gkm") return "gkm"; // will be created if not exists
   return v; // fallback to given string
