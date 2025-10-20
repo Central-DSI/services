@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../config/prisma.js";
 import { ENV } from "../config/env.js";
-import { addRoleToUser, createUser, findRoleByName, findUserByEmailOrIdentity, getOrCreateRole, hasUserRole, findStudentStatusByName, createStudentStatus, createStudentForUser, findLecturerByUserId, createLecturerForUser } from "../repositories/user.repository.js";
+import { addRolesToUser, createUser, findUserByEmailOrIdentity, getOrCreateRole, findStudentStatusByName, createStudentStatus, createStudentForUser, findLecturerByUserId, createLecturerForUser } from "../repositories/user.repository.js";
 import { deriveEnrollmentYearFromNIM } from "../utils/global.util.js";
 import { generatePassword } from "../utils/password.util.js";
 import { sendMail } from "../config/mailer.js";
@@ -44,8 +44,7 @@ export async function adminCreateUser({ fullName, email, roles = [], identityNum
 	console.log("[adminCreateUser] unique (no normalization):", uniqueRoles);
 	for (const rn of uniqueRoles) {
 		const role = await getOrCreateRole(rn);
-		const exists = await hasUserRole(user.id, role.id);
-		if (!exists) await addRoleToUser(user.id, role.id);
+		await addRolesToUser(user.id, [role.id]); // idempotent via skipDuplicates
 	}
 
 	// If role 'student' is assigned, ensure Student record exists

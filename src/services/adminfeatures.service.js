@@ -2,13 +2,23 @@ import csv from "csv-parser";
 import { Readable } from "stream";
 import prisma from "../config/prisma.js";
 import { getOrCreateRole } from "../repositories/adminfeatures.repository.js";
-// removed admin password generation feature
+import {
+	findUserById,
+	updateUserById as repoUpdateUserById,
+	findRoleByName,
+	getOrCreateRole as getOrCreateRoleFromUserRepo,
+	getUserRolesWithIds,
+	upsertUserRole,
+	findStudentByUserId,
+	createStudentForUser,
+	findLecturerByUserId,
+	createLecturerForUser,
+} from "../repositories/user.repository.js";
 
 function clean(v) {
 	if (v == null) return "";
 	return String(v).replace(/[\u00A0\u200B]/g, " ").trim();
 }
-
 function deriveEnrollmentYearFromNIM(nim) {
 	const s = String(nim || "").trim();
 	if (s.length >= 2) {
@@ -17,7 +27,106 @@ function deriveEnrollmentYearFromNIM(nim) {
 	}
 	return null;
 }
+export async function adminUpdateUser(id, payload = {}) {
+	if (!id) {
+		const err = new Error("User id is required");
+		err.statusCode = 400;
+		throw err;
+	}
 
+	const user = await findUserById(id);
+	if (!user) {
+		const err = new Error("User not found");
+		err.statusCode = 404;
+		throw err;
+	}
+
+	const { fullName, email, roles, identityNumber, identityType, isVerified } = payload || {};
+
+	// Prepare update data
+	const updateData = {};
+	if (typeof fullName === "string" && fullName.trim()) updateData.fullName = fullName.trim();
+	if (typeof email === "string" && email.trim()) updateData.email = email.trim().toLowerCase();
+	if (typeof identityNumber === "string" && identityNumber.trim()) updateData.identityNumber = identityNumber.trim();
+	if (typeof identityType === "string") updateData.identityType = identityType;
+	if (typeof isVerified === "boolean") updateData.isVerified = isVerified;
+
+	if (Object.keys(updateData).length) {
+		try {
+			await repoUpdateUserById(id, updateData);
+		} catch (e) {
+			// Handle unique constraint errors gracefully
+			if (e && e.code === "P2002") {
+				const err = new Error("Email or identity number already in use");
+				err.statusCode = 409;
+				throw err;
+			}
+			throw e;
+		}
+	}
+
+	// Update roles if provided (manage only non-admin roles)
+	if (Array.isArray(roles)) {
+			// roles can be string[] or {name, status}[]
+			const desired = [];
+			for (const r of roles) {
+				if (typeof r === "string") desired.push({ name: r, status: undefined });
+				else if (r && typeof r.name === "string") desired.push({ name: r.name, status: r.status });
+			}
+			// Normalize
+			const desiredClean = desired
+				.map((x) => ({ name: x.name.trim().toLowerCase(), status: x.status }))
+				.filter((x) => x.name && x.name !== "admin");
+
+			// Map role names -> role ids, then upsert with status if provided
+			const existing = await getUserRolesWithIds(id);
+			const existingByRoleId = new Map(existing.map((ur) => [ur.roleId, ur]));
+			const existingByName = new Map(existing.map((ur) => [String(ur.role?.name || "").toLowerCase(), ur]));
+
+			for (const item of desiredClean) {
+				let role = await findRoleByName(item.name);
+				if (!role) role = await getOrCreateRoleFromUserRepo(item.name);
+				const current = existingByRoleId.get(role.id) || existingByName.get(item.name);
+				const status = item.status || current?.status || "active";
+				// Upsert and update status when provided. Non-destructive for other roles.
+				await upsertUserRole(id, role.id, status);
+			}
+	}
+
+	// Ensure Student/Lecturer records when relevant
+	const latest = await findUserById(id);
+	const currentRoles = await getUserRolesWithIds(id);
+	const roleNames = new Set(currentRoles.map((r) => (r.role?.name || "").toLowerCase()));
+	const type = (latest?.identityType || identityType || "").toString();
+
+	// Student
+	if (roleNames.has("student") || type === "NIM") {
+		const existingStudent = await findStudentByUserId(id);
+		if (!existingStudent) {
+			const enrollmentYear = deriveEnrollmentYearFromNIM(latest?.identityNumber || identityNumber);
+			await createStudentForUser({ userId: id, enrollmentYear, skscompleted: 0 });
+		}
+	}
+
+	// Lecturer
+	if (roleNames.has("lecturer") || type === "NIP") {
+		const existingLect = await findLecturerByUserId(id);
+		if (!existingLect) {
+			await createLecturerForUser({ userId: id });
+		}
+	}
+
+	// Return user with roles for client convenience
+	const result = await prisma.user.findUnique({
+		where: { id },
+		include: {
+			userHasRoles: { include: { role: true } },
+			student: true,
+			lecturer: true,
+		},
+	});
+	return result;
+}
 export async function importStudentsCsvFromUpload(fileBuffer) {
 	if (!fileBuffer || !fileBuffer.length) {
 		const err = new Error("CSV file is required");
@@ -165,6 +274,83 @@ export async function importStudentsCsvFromUpload(fileBuffer) {
 	};
 }
 
-// Generate passwords for users who don't have one (password is null) and send via SMTP
-// (removed) generatePasswordsForUsersWithoutPassword
+// Create Academic Year (Admin)
+export async function createAcademicYear({ semester = "ganjil", year, startDate, endDate }) {
+	// Optional: basic date check
+	if (startDate && endDate) {
+		const s = new Date(startDate);
+		const e = new Date(endDate);
+		if (!isNaN(s) && !isNaN(e) && s > e) {
+			const err = new Error("startDate must be before endDate");
+			err.statusCode = 400;
+			throw err;
+		}
+	}
+
+	// Prevent duplicates by (semester, year) when year provided
+	if (typeof year === "number") {
+		const existing = await prisma.academicYear.findFirst({ where: { semester, year } });
+		if (existing) {
+			const err = new Error("Academic year already exists for this semester and year");
+			err.statusCode = 409;
+			throw err;
+		}
+	}
+
+	const created = await prisma.academicYear.create({
+		data: {
+			semester,
+			year: typeof year === "number" ? year : null,
+			startDate: startDate ? new Date(startDate) : null,
+			endDate: endDate ? new Date(endDate) : null,
+		},
+	});
+	return created;
+}
+
+export async function updateAcademicYear(id, { semester, year, startDate, endDate } = {}) {
+	if (!id) {
+		const err = new Error("Academic year id is required");
+		err.statusCode = 400;
+		throw err;
+	}
+
+	if (startDate && endDate) {
+		const s = new Date(startDate);
+		const e = new Date(endDate);
+		if (!isNaN(s) && !isNaN(e) && s > e) {
+			const err = new Error("startDate must be before endDate");
+			err.statusCode = 400;
+			throw err;
+		}
+	}
+
+	// Ensure exists
+	const existing = await prisma.academicYear.findUnique({ where: { id } });
+	if (!existing) {
+		const err = new Error("Academic year not found");
+		err.statusCode = 404;
+		throw err;
+	}
+
+	// When both semester & year provided, prevent duplicates
+	if (semester && typeof year === "number") {
+		const dup = await prisma.academicYear.findFirst({ where: { semester, year, NOT: { id } } });
+		if (dup) {
+			const err = new Error("Another academic year with the same semester and year already exists");
+			err.statusCode = 409;
+			throw err;
+		}
+	}
+
+	const data = {};
+	if (semester) data.semester = semester;
+	if (typeof year === "number") data.year = year;
+	if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
+	if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
+
+	const updated = await prisma.academicYear.update({ where: { id }, data });
+	return updated;
+}
+
 

@@ -24,15 +24,17 @@ export function createUser({ fullName, email, password, identityNumber, identity
 	});
 }
 
-export function getOrCreateRole(name) {
-	return prisma.userRole.upsert({
-		where: { id: undefined },
-		update: {},
-		create: { name },
-	}).catch(async () => {
+export async function getOrCreateRole(name) {
+	try {
+		return await prisma.userRole.upsert({
+			where: { id: undefined },
+			update: {},
+			create: { name },
+		});
+	} catch {
 		const existing = await prisma.userRole.findFirst({ where: { name } });
-		return existing || prisma.userRole.create({ data: { name } });
-	});
+		return await (existing || prisma.userRole.create({ data: { name } }));
+	}
 }
 
 export function ensureUserRole(userId, roleId) {

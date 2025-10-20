@@ -1,4 +1,4 @@
-import { importStudentsCsvFromUpload } from "../services/adminfeatures.service.js";
+import { importStudentsCsvFromUpload, adminUpdateUser, createAcademicYear, updateAcademicYear } from "../services/adminfeatures.service.js";
 
 export async function importStudentsCsv(req, res, next) {
 	try {
@@ -15,3 +15,38 @@ export async function importStudentsCsv(req, res, next) {
 	}
 }
 
+
+export async function updateUserByAdmin(req, res, next) {
+  try {
+    const { id } = req.params;
+		const body = req.validated ?? req.body ?? {};
+		const { fullName, email, roles, identityNumber, identityType, isVerified } = body;
+    const user = await adminUpdateUser(id, { fullName, email, roles, identityNumber, identityType, isVerified });
+    res.status(200).json({ success: true, user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createAcademicYearController(req, res, next) {
+	try {
+		const body = req.validated ?? req.body ?? {};
+		const { semester, year, startDate, endDate } = body;
+		const ay = await createAcademicYear({ semester, year, startDate, endDate });
+		res.status(201).json({ success: true, academicYear: ay });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function updateAcademicYearController(req, res, next) {
+	try {
+		const { id } = req.params;
+		const body = req.validated ?? req.body ?? {};
+		const { semester, year, startDate, endDate } = body;
+		const updated = await updateAcademicYear(id, { semester, year, startDate, endDate });
+		res.status(200).json({ success: true, academicYear: updated });
+	} catch (err) {
+		next(err);
+	}
+}
