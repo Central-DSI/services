@@ -120,7 +120,6 @@ model ScienceGroup {
   id        String   @id @default(uuid())
   name      String
   lecturers Lecturer[]
-  thesisTopics ThesisTopic[]
 
   @@map("science_groups")
 }
@@ -194,8 +193,6 @@ model ThesisParticipant {
 model ThesisTopic {
   id              String   @id @default(uuid())
   name            String
-  scienceGroupId  String?  @map("science_group_id")
-  scienceGroup    ScienceGroup? @relation(fields: [scienceGroupId], references: [id])
   thesis          Thesis[]
 
   @@map("thesis_topics")

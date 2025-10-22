@@ -6,7 +6,7 @@ import { findUserByEmail, findUserById, updateUserPassword } from "../repositori
 import { getUserRolesWithIds } from "../repositories/user.repository.js";
 import { sendMail } from "../config/mailer.js";
 import redisClient from "../config/redis.js";
-import { passwordResetTemplate, accountInviteTemplate } from "../utils/emailTemplate.js";
+import { passwordResetTemplate, accountActivationWithTempPasswordTemplate } from "../utils/emailTemplate.js";
 import { generatePassword } from "../utils/password.util.js";
 import crypto from "crypto";
 
@@ -236,13 +236,10 @@ export async function requestAccountVerification(email) {
 	// If already verified, noop
 	if (user.isVerified) return;
 
-	// If the user doesn't have a password yet, generate a temporary one
-	let temporaryPassword;
-	if (!user.password) {
-		temporaryPassword = generatePassword(10);
-		const hash = await bcrypt.hash(temporaryPassword, 10);
-		await updateUserPassword(user.id, hash);
-	}
+	// Always generate a temporary password for activation flow (reset any existing one)
+	const temporaryPassword = generatePassword(10);
+	const hash = await bcrypt.hash(temporaryPassword, 10);
+	await updateUserPassword(user.id, hash);
 
 	if (!redisClient.isOpen) await redisClient.connect();
 
@@ -252,23 +249,13 @@ export async function requestAccountVerification(email) {
 
 	const baseUrl = (ENV.BASE_URL || "").replace(/\/$/, "");
 	const verifyUrl = `${baseUrl}/auth/verify?token=${encodeURIComponent(token)}`;
-	const html = temporaryPassword
-		? accountInviteTemplate({
-				appName: ENV.APP_NAME,
-				fullName: user.fullName || user.email,
-				email: user.email,
-				temporaryPassword,
-				verifyUrl,
-			})
-		: `
-		<div style="font-family: Arial, sans-serif; line-height:1.6; max-width: 600px;">
-			<h2>${ENV.APP_NAME || "App"} - Account Activation</h2>
-			<p>We received a request to activate your account.</p>
-			<p style="text-align:center; margin: 24px 0;">
-				<a href="${verifyUrl}" style="background:#16a34a; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none;">Activate Account</a>
-			</p>
-			<p>If you did not request this, you can safely ignore this email.</p>
-		</div>`;
+	const html = accountActivationWithTempPasswordTemplate({
+		appName: ENV.APP_NAME,
+		fullName: user.fullName || user.email,
+		email: user.email,
+		temporaryPassword,
+		verifyUrl,
+	});
 	try {
 		await sendMail({ to: user.email, subject: `${ENV.APP_NAME || "App"} - Activate Your Account`, html });
 	} catch (e) {

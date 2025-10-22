@@ -12,14 +12,7 @@ export function passwordResetTemplate({ appName, fullName, resetUrl, expiresInMi
 	</div>`;
 }
 
-export function simpleButtonTemplate({ title, message, buttonText, url }) {
-	return `
-	<div style="font-family: Arial, sans-serif; line-height:1.6; max-width: 600px;">
-		<h2>${title || "Notification"}</h2>
-		<p>${message || ""}</p>
-		${url ? `<p style="text-align:center; margin: 24px 0;"><a href="${url}" style="background:#2563eb; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none;">${buttonText || "Open"}</a></p>` : ""}
-	</div>`;
-}
+// (removed unused: simpleButtonTemplate)
 
 export function accountInviteTemplate({ appName, fullName, email, temporaryPassword, verifyUrl }) {
 	return `
@@ -35,6 +28,27 @@ export function accountInviteTemplate({ appName, fullName, email, temporaryPassw
 		<p style="text-align:center; margin: 24px 0;">
 			<a href="${verifyUrl}" style="background:#16a34a; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none;">Verify Account</a>
 		</p>
+		<p>Thanks,<br/>The ${appName || "App"} Team</p>
+	</div>`;
+}
+
+// (removed unused: accountActivationTemplate)
+
+export function accountActivationWithTempPasswordTemplate({ appName, fullName, email, temporaryPassword, verifyUrl }) {
+  return `
+	<div style="font-family: Arial, sans-serif; line-height:1.6; max-width: 600px;">
+		<h2>${appName || "App"} - Account Activation</h2>
+		<p>Hi ${fullName || email || "User"},</p>
+		<p>We're almost there. A temporary password has been generated for your account. Please activate your account first, then sign in using the credentials below:</p>
+		<p>
+			<strong>Email:</strong> ${email}<br/>
+			<strong>Temporary Password:</strong> ${temporaryPassword}
+		</p>
+		<p style="text-align:center; margin: 24px 0;">
+			<a href="${verifyUrl}" style="background:#16a34a; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none;">Activate Account</a>
+		</p>
+		<p>For your security, please change your password after your first login.</p>
+		<p>If you did not request this, you can safely ignore this email.</p>
 		<p>Thanks,<br/>The ${appName || "App"} Team</p>
 	</div>`;
 }
