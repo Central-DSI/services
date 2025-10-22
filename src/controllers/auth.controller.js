@@ -127,8 +127,15 @@ export async function requestAccountVerificationController(req, res, next) {
 			err.statusCode = 400;
 			throw err;
 		}
-		await requestAccountVerification(email);
-		res.json({ success: true });
+		const result = await requestAccountVerification(email);
+		// If service returns structured info, forward helpful message
+		if (result && result.found === false) {
+			return res.status(200).json({ success: true, message: result.message, code: "EMAIL_NOT_FOUND" });
+		}
+		if (result && result.alreadyVerified) {
+			return res.status(200).json({ success: true, message: result.message, code: "ALREADY_VERIFIED" });
+		}
+		return res.json({ success: true });
 	} catch (err) {
 		next(err);
 	}

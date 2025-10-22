@@ -231,10 +231,14 @@ export async function requestAccountVerification(email) {
 		throw err;
 	}
 	const user = await findUserByEmail(normalized);
-	// Return success regardless to avoid email enumeration, but do nothing if not found
-	if (!user || !user.email) return;
+	// If not found, return explicit info for frontend as requested
+	if (!user || !user.email) {
+		return { found: false, message: "Email tidak terdaftar. Silakan hubungi admin untuk aktivasi akun." };
+	}
 	// If already verified, noop
-	if (user.isVerified) return;
+	if (user.isVerified) {
+		return { found: true, alreadyVerified: true, message: "Akun sudah terverifikasi." };
+	}
 
 	// Always generate a temporary password for activation flow (reset any existing one)
 	const temporaryPassword = generatePassword(10);
@@ -262,5 +266,7 @@ export async function requestAccountVerification(email) {
 		// log server-side, but don't reveal to client
 		console.error("❌ SMTP send failed (verify request):", e?.message || e);
 	}
+
+	return { found: true, alreadyVerified: false, sent: true };
 }
 

@@ -14,7 +14,8 @@
     "fix:sks": "node scripts/fill-sks.js",
     "fix:student-status": "node scripts/fill-student-status.js",
     "seed:thesis-dummy": "node scripts/seed-thesis.js",
-    "seed:thesis-participants": "node scripts/seed-thesis-participants.js"
+    "seed:thesis-participants": "node scripts/seed-thesis-participants.js",
+    "seed:thesis-guidance": "node scripts/seed-thesis-guidance.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
