@@ -1234,6 +1234,11 @@ components:
         email:
           type: string
           format: email
+        roles:
+          type: array
+          description: Roles owned by the user
+          items:
+            $ref: "#/components/schemas/RoleItem"
     LoginResponse:
       type: object
       properties:
@@ -1246,6 +1251,16 @@ components:
           type: string
         refreshToken:
           type: string
+    RoleItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, nonActive]
     RefreshRequest:
       type: object
       required: [refreshToken]
