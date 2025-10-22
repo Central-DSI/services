@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../config/prisma.js";
 import { ENV } from "../config/env.js";
 import { findUserByEmail, findUserById, updateUserPassword } from "../repositories/auth.repository.js";
+import { getUserRolesWithIds } from "../repositories/user.repository.js";
 import { sendMail } from "../config/mailer.js";
 import redisClient from "../config/redis.js";
 import { passwordResetTemplate, accountInviteTemplate } from "../utils/emailTemplate.js";
@@ -44,8 +45,16 @@ export async function loginWithEmailPassword(email, password) {
 			data: { refreshToken: refreshHash },
 		});
 
+	// Fetch roles for the user (from user_has_roles -> user_roles)
+	const roleAssignments = await getUserRolesWithIds(user.id);
+	const roles = (roleAssignments || []).map((ra) => ({
+		id: ra?.role?.id,
+		name: ra?.role?.name,
+		status: ra?.status,
+	}));
+
 	return {
-		user: { id: user.id, fullName: user.fullName, email: user.email },
+		user: { id: user.id, fullName: user.fullName, email: user.email, roles },
 		accessToken,
 		refreshToken,
 	};
