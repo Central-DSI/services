@@ -221,6 +221,33 @@ export async function verifyAccountToken(token) {
 }
 
 // -----------------------------
+// Get Current User Profile (with roles)
+// -----------------------------
+export async function getUserProfile(userId) {
+	const user = await findUserById(userId);
+	if (!user) {
+		const err = new Error("User not found");
+		err.statusCode = 404;
+		throw err;
+	}
+
+	// Fetch roles for the user (from user_has_roles -> user_roles)
+	const roleAssignments = await getUserRolesWithIds(userId);
+	const roles = (roleAssignments || []).map((ra) => ({
+		id: ra?.role?.id,
+		name: ra?.role?.name,
+		status: ra?.status,
+	}));
+
+	return {
+		id: user.id,
+		fullName: user.fullName,
+		email: user.email,
+		roles,
+	};
+}
+
+// -----------------------------
 // User-initiated Account Activation Request
 // -----------------------------
 export async function requestAccountVerification(email) {
