@@ -117,6 +117,9 @@ paths:
   "/thesisGuidance/lecturer/progress/{studentId}/final-approval":
     $ref: "./thesisGuidance/lecturer.yaml#/lecturer_final_approval"
 
+  "/thesisGuidance/lecturer/progress/{studentId}/fail":
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_fail_thesis"
+
   "/thesisGuidance/lecturer/guidance-history/{studentId}":
     $ref: "./thesisGuidance/lecturer.yaml#/lecturer_guidance_history"
 
@@ -161,6 +164,11 @@ paths:
 
 components:
   schemas:
+    FailThesisBody:
+      type: object
+      properties:
+        reason:
+          type: string
     FeedbackBody:
       type: object
       required: [feedback]
