@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "prisma db seed",
@@ -16,6 +16,9 @@
     "seed:thesis-dummy": "node scripts/seed-thesis.js",
     "seed:thesis-participants": "node scripts/seed-thesis-participants.js",
     "seed:thesis-guidance": "node scripts/seed-thesis-guidance.js"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.1"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

@@ -48,6 +48,9 @@ export const ENV = {
   // ===============================
   CRON_TIME_NOTIFY: process.env.CRON_TIME_NOTIFY || "0 * * * *",
   ENABLE_CRON: toBool(process.env.ENABLE_CRON),
+  // Thesis status cron controls
+  THESIS_STATUS_CRON: process.env.THESIS_STATUS_CRON || "30 2 * * *", // 02:30 every day
+  THESIS_STATUS_TZ: process.env.THESIS_STATUS_TZ || "Asia/Jakarta", // WIB (UTC+7)
 
   // ===============================
   // 🧰 LOGGING

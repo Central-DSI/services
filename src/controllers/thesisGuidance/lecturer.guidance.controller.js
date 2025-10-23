@@ -11,6 +11,7 @@ import {
 	guidanceHistoryService,
 	activityLogService,
 		supervisorEligibilityService,
+		failStudentThesisService,
 } from "../../services/thesisGuidance/lecturer.guidance.service.js";
 
 export async function myStudents(req, res, next) {
@@ -141,6 +142,17 @@ export async function supervisorEligibility(req, res, next) {
 	try {
 		const threshold = req.query?.threshold ? Number(req.query.threshold) : undefined;
 		const result = await supervisorEligibilityService(req.user.sub, Number.isFinite(threshold) ? threshold : undefined);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function failStudentThesis(req, res, next) {
+	try {
+		const { studentId } = req.params;
+		const { reason } = req.body || {};
+		const result = await failStudentThesisService(req.user.sub, studentId, { reason });
 		res.json({ success: true, ...result });
 	} catch (err) {
 		next(err);

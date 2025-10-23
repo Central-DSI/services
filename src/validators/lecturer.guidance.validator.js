@@ -12,3 +12,7 @@ export const approveGuidanceSchema = z.object({
 export const approveComponentsSchema = z.object({
   componentIds: z.array(z.string().min(1)).min(1, "componentIds cannot be empty"),
 });
+
+export const failThesisSchema = z.object({
+  reason: z.string().min(1).optional(),
+});

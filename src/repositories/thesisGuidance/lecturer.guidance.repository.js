@@ -212,3 +212,15 @@ export async function countGraduatedAsSupervisor2(lecturerId) {
 	return graduatedStudentIds.size;
 }
 
+// Resolve ThesisStatus name->id map (lowercased name keys)
+export async function getThesisStatusMap() {
+	const statuses = await prisma.thesisStatus.findMany({ select: { id: true, name: true } });
+	const map = new Map(statuses.map((s) => [String(s.name || "").toLowerCase(), s.id]));
+	return map;
+}
+
+// Update thesis status by id
+export async function updateThesisStatusById(thesisId, thesisStatusId) {
+	return prisma.thesis.update({ where: { id: thesisId }, data: { thesisStatusId } });
+}
+

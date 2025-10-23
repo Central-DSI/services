@@ -1,7 +1,7 @@
 import express from "express";
 import { authGuard, requireAnyRole } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/validation.middleware.js";
-import { feedbackSchema, approveGuidanceSchema, approveComponentsSchema } from "../../validators/lecturer.guidance.validator.js";
+import { feedbackSchema, approveGuidanceSchema, approveComponentsSchema, failThesisSchema } from "../../validators/lecturer.guidance.validator.js";
 import {
 	myStudents,
 	listRequests,
@@ -15,6 +15,7 @@ import {
 	guidanceHistory,
 	activityLog,
 		supervisorEligibility,
+		failStudentThesis,
 } from "../../controllers/thesisGuidance/lecturer.guidance.controller.js";
 
 const router = express.Router();
@@ -33,6 +34,7 @@ router.get("/progress", listProgress);
 router.get("/progress/:studentId", progressDetail);
 router.patch("/progress/:studentId/approve", validate(approveComponentsSchema), approveProgressComponents);
 router.patch("/progress/:studentId/final-approval", finalApproval);
+router.patch("/progress/:studentId/fail", validate(failThesisSchema), failStudentThesis);
 
 router.post("/feedback/:guidanceId", validate(feedbackSchema), postFeedback);
 

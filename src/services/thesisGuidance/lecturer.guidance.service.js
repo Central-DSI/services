@@ -16,6 +16,8 @@ import {
 	listGuidanceHistory,
 	listActivityLogs,
 	countGraduatedAsSupervisor2,
+  getThesisStatusMap,
+  updateThesisStatusById,
 } from "../../repositories/thesisGuidance/lecturer.guidance.repository.js";
 
 function ensureLecturer(lecturer) {
@@ -177,5 +179,37 @@ export async function supervisorEligibilityService(userId, threshold = 4) {
 	const graduatedAsSup2 = await countGraduatedAsSupervisor2(lecturer.id);
 	const eligible = graduatedAsSup2 >= threshold;
 	return { eligible, graduatedAsSup2, required: threshold };
+}
+
+// Lecturer decides to stop supervising and mark thesis as failed, only if current status is at_risk
+export async function failStudentThesisService(userId, studentId, { reason } = {}) {
+	const lecturer = await getLecturerByUserId(userId);
+	ensureLecturer(lecturer);
+
+	const thesis = await getStudentActiveThesis(studentId, lecturer.id);
+	if (!thesis) {
+		const err = new Error("Student thesis not found for this lecturer");
+		err.statusCode = 404;
+		throw err;
+	}
+
+	const statusMap = await getThesisStatusMap();
+	const idAtRisk = statusMap.get("at_risk") || statusMap.get("at-risk");
+	const idFailed = statusMap.get("failed");
+	if (!idAtRisk || !idFailed) {
+		const err = new Error("Missing ThesisStatus rows: require 'at_risk' and 'failed'");
+		err.statusCode = 500;
+		throw err;
+	}
+
+	if (thesis.thesisStatusId !== idAtRisk) {
+		const err = new Error("Thesis cannot be failed unless current status is 'at_risk'");
+		err.statusCode = 400;
+		throw err;
+	}
+
+	await updateThesisStatusById(thesis.id, idFailed);
+	await logThesisActivity(thesis.id, userId, "THESIS_FAILED", reason || undefined);
+	return { thesisId: thesis.id, status: "failed" };
 }
 

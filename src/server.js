@@ -1,6 +1,7 @@
 import app from "./app.js";
 import { ENV } from "./config/env.js";
 import { initConnections } from "./config/db.js";
+import { scheduleDailyThesisStatus } from "./queues/maintenance.queue.js";
 // removed password queue worker; using user-initiated account activation instead
 
 const PORT = ENV.PORT || 3000;
@@ -8,6 +9,8 @@ const PORT = ENV.PORT || 3000;
 async function startServer() {
   try {
     await initConnections(); // ✅ pastikan DB & Redis ready
+    // Schedule daily maintenance jobs
+    await scheduleDailyThesisStatus();
     app.listen(PORT, () => {
       console.log(`✅ Server running at http://localhost:${PORT}`);
     });
