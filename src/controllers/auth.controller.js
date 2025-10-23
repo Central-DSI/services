@@ -1,4 +1,4 @@
-import { loginWithEmailPassword, refreshTokens, logout, verifyAccessToken, changePassword, requestPasswordReset, verifyPasswordResetToken, resetPasswordWithToken, verifyAccountToken, requestAccountVerification } from "../services/auth.service.js";
+import { loginWithEmailPassword, refreshTokens, logout, verifyAccessToken, changePassword, requestPasswordReset, verifyPasswordResetToken, resetPasswordWithToken, verifyAccountToken, requestAccountVerification, getUserProfile } from "../services/auth.service.js";
 
 export async function login(req, res, next) {
 	try {
@@ -31,8 +31,13 @@ export async function refresh(req, res, next) {
 	}
 }
 
-export async function me(req, res) {
-	res.json({ success: true, user: req.user });
+export async function me(req, res, next) {
+	try {
+		const userProfile = await getUserProfile(req.user.sub);
+		res.json({ success: true, user: userProfile });
+	} catch (err) {
+		next(err);
+	}
 }
 
 export async function doLogout(req, res, next) {
