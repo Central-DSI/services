@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../config/prisma.js";
 import { ENV } from "../config/env.js";
 import { findUserByEmail, findUserById, updateUserPassword } from "../repositories/auth.repository.js";
-import { getUserRolesWithIds } from "../repositories/user.repository.js";
+import { getUserRolesWithIds } from "../repositories/adminfeatures.repository.js";
 import { sendMail } from "../config/mailer.js";
 import redisClient from "../config/redis.js";
 import { passwordResetTemplate, accountActivationWithTempPasswordTemplate } from "../utils/emailTemplate.js";
