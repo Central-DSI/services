@@ -5,9 +5,9 @@ info:
   description: |
     OpenAPI specification for the Backend API (Express + Prisma + Redis).
 
-    Notes:
-    - The current implementation includes minimal sample routes for /user and /notification.
-    - Error responses follow a unified JSON format from error.middleware.js.
+  Notes:
+  - Spec is modularized by feature area (auth, admin, thesis guidance) using external $refs.
+  - Error responses follow a unified JSON format from error.middleware.js.
   contact:
     name: API Support
 servers:
@@ -17,16 +17,14 @@ servers:
 tags:
   - name: System
     description: System/health endpoints
-  - name: User
-    description: User sample endpoints
-  - name: Notification
-    description: Notification sample endpoints
   - name: Auth
     description: Authentication endpoints (JWT access + refresh)
   - name: AdminFeatures
     description: Admin-only utilities and maintenance endpoints
-  - name: ThesisGuidance
-    description: Thesis guidance endpoints
+  - name: LecturerThesisGuidance
+    description: Lecturer-side thesis guidance endpoints
+  - name: StudentThesisGuidance
+    description: Student-side thesis guidance endpoints
 
 paths:
   "/":
@@ -49,1006 +47,117 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  "/user":
-    get:
-      tags: [User]
-      summary: Get sample users
-      operationId: getUsers
-      responses:
-        "200":
-          description: Sample list of users
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  route:
-                    type: string
-                  message:
-                    type: string
-                  sample:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/UserSample"
-              example:
-                route: "/user"
-                message: "User route is alive"
-                sample:
-                  - id: 1
-                    name: Alice
-                    email: alice@example.com
-                  - id: 2
-                    name: Bob
-                    email: bob@example.com
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-    post:
-      tags: [User]
-      summary: Admin - Create user and assign roles
-      description: |
-        Create a new user account and assign roles. This endpoint is restricted to administrators.
-        Notes:
-        - The 'admin' role cannot be assigned via this endpoint and will be ignored if provided.
-        - The system generates a temporary password and emails it to the user along with a verification link.
-      operationId: adminCreateUser
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateUserRequest"
-            example:
-              fullName: "Budi Santoso"
-              email: "budi@example.com"
-              roles: ["student", "pembimbing 1"]
-              identityNumber: "2211529999"
-              identityType: "NIM"
-      responses:
-        "201":
-          description: User created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CreateUserResponse"
-              example:
-                message: "User created"
-                user:
-                  id: "uuid"
-                  email: "budi@example.com"
-                  roles: ["student", "pembimbing 1"]
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  "/user/{id}":
-    get:
-      tags: [User]
-      summary: Get sample user by id (echo)
-      operationId: getUserById
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-          description: User id
-      responses:
-        "200":
-          description: Echoes the id received
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  route:
-                    type: string
-                  id:
-                    type: string
-              example:
-                route: "/user/:id"
-                id: "1"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  "/notification":
-    get:
-      tags: [Notification]
-      summary: Get sample notifications
-      operationId: getNotifications
-      responses:
-        "200":
-          description: Sample list of notifications
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  route:
-                    type: string
-                  message:
-                    type: string
-                  examples:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/NotificationSample"
-              example:
-                route: "/notification"
-                message: "Notification route is alive"
-                examples:
-                  - id: 1
-                    title: Welcome
-                    message: Hello there!
-                  - id: 2
-                    title: Reminder
-                    message: Don't forget to check in.
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-    post:
-      tags: [Notification]
-      summary: Create a sample notification (echo)
-      operationId: createNotification
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-            example:
-              title: Hello
-              message: World
-      responses:
-        "201":
-          description: Echoes the received payload
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  route:
-                    type: string
-                  action:
-                    type: string
-                  received:
-                    type: object
-                    additionalProperties: true
-              example:
-                route: "/notification"
-                action: "create"
-                received:
-                  title: Hello
-                  message: World
-        "500":
-          $ref: "#/components/responses/InternalError"
+  
 
   "/auth/login":
-    post:
-      tags: [Auth]
-      summary: Login with email and password
-      operationId: authLogin
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
-            example:
-              email: user@example.com
-              password: password123
-      responses:
-        "200":
-          description: Login success
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LoginResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_login"
 
   "/auth/refresh":
-    post:
-      tags: [Auth]
-      summary: Refresh access token
-      operationId: authRefresh
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RefreshRequest"
-            example:
-              refreshToken: <refresh-token>
-      responses:
-        "200":
-          description: New tokens issued
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RefreshResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_refresh"
 
   "/auth/me":
-    get:
-      tags: [Auth]
-      summary: Get current user info (from access token)
-      operationId: authMe
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Current user
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  user:
-                    type: object
-                    description: JWT payload
-                    additionalProperties: true
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_me"
 
   "/auth/logout":
-    post:
-      tags: [Auth]
-      summary: Logout (revoke refresh token)
-      operationId: authLogout
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Logged out
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_logout"
 
   "/auth/password":
-    patch:
-      tags: [Auth]
-      summary: Change password
-      operationId: authChangePassword
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ChangePasswordRequest"
-            example:
-              currentPassword: oldpass123
-              newPassword: newpass456
-      responses:
-        "200":
-          description: Password changed
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_password"
 
   "/auth/reset/request":
-    post:
-      tags: [Auth]
-      summary: Request password reset (send email)
-      operationId: authResetRequest
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email:
-                  type: string
-                  format: email
-            example:
-              email: user@example.com
-      responses:
-        "200":
-          description: Email sent (or ignored to avoid enumeration)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_reset_request"
 
   "/auth/reset/verify":
-    get:
-      tags: [Auth]
-      summary: Verify password reset token
-      operationId: authResetVerify
-      parameters:
-        - in: query
-          name: token
-          schema:
-            type: string
-          required: true
-      responses:
-        "200":
-          description: Token is valid
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  tokenValid:
-                    type: boolean
-                    example: true
-                  sub:
-                    type: string
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_reset_verify"
 
   "/auth/reset/confirm":
-    post:
-      tags: [Auth]
-      summary: Reset password with token
-      operationId: authResetConfirm
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token, newPassword]
-              properties:
-                token:
-                  type: string
-                newPassword:
-                  type: string
-            example:
-              token: <token>
-              newPassword: newpass123
-      responses:
-        "200":
-          description: Password updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./auth/swagger-auth.yaml#/auth_reset_confirm"
 
   "/adminfeatures/students/import":
-    post:
-      tags: [AdminFeatures]
-      summary: Admin - Import students from CSV
-      description: |
-        Upload a CSV to import student accounts.
-        - Required headers: nim, nama, email
-        - Optional header: sks_completed
-        - Rows with existing email are skipped (no updates)
-        - New users are created with password=null and isVerified=false
-        - Assigns role "student" and creates Student with enrollmentYear derived from NIM
-        - Supports separator "," or ";" automatically
-      operationId: adminImportStudentsCsv
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file:
-                  type: string
-                  format: binary
-            encoding:
-              file:
-                contentType: text/csv
-      responses:
-        "200":
-          description: Import summary
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  summary:
-                    $ref: "#/components/schemas/ImportStudentsSummary"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./admin/swagger-admin.yaml#/admin_import_students"
+
+  "/adminfeatures/users":
+    $ref: "./admin/swagger-admin.yaml#/admin_create_user"
 
   "/adminfeatures/{id}":
-    patch:
-      tags: [AdminFeatures]
-      summary: Admin - Update user and add roles
-      description: |
-        Update a user's data and add (non-admin) roles without removing existing ones.
-        Notes:
-        - The 'admin' role will not be granted or removed by this endpoint.
-        - If the resulting roles include 'student' or identityType is NIM, a Student record is ensured.
-        - If lecturer-related roles are used or identityType is NIP, a Lecturer record is ensured.
-      operationId: adminUpdateUser
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-          description: User id (UUID)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateUserRequest"
-            example:
-              fullName: "Budi Santoso"
-              email: "budi@example.com"
-              roles:
-                - name: "student"
-                  status: "active"
-                - name: "pembimbing 1"
-                  status: "nonActive"
-              identityNumber: "2211529999"
-              identityType: "NIM"
-              isVerified: true
-      responses:
-        "200":
-          description: Updated user
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  user:
-                    type: object
-                    description: Updated user with roles/student/lecturer relations
-                    additionalProperties: true
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          description: User not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./admin/swagger-admin.yaml#/admin_update_user"
 
   "/adminfeatures/academic-years":
-    post:
-      tags: [AdminFeatures]
-      summary: Admin - Create academic year
-      operationId: adminCreateAcademicYear
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateAcademicYearRequest"
-            example:
-              semester: ganjil
-              year: 2025
-              startDate: "2025-08-01T00:00:00.000Z"
-              endDate: "2026-01-31T00:00:00.000Z"
-      responses:
-        "201":
-          description: Academic year created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  academicYear:
-                    type: object
-                    additionalProperties: true
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./admin/swagger-admin.yaml#/admin_create_academic_year"
   "/adminfeatures/academic-years/{id}":
-    patch:
-      tags: [AdminFeatures]
-      summary: Admin - Update academic year
-      operationId: adminUpdateAcademicYear
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-          description: Academic year id (UUID)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateAcademicYearRequest"
-            example:
-              semester: genap
-              year: 2026
-              startDate: "2026-02-01T00:00:00.000Z"
-              endDate: "2026-07-31T00:00:00.000Z"
-      responses:
-        "200":
-          description: Academic year updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  academicYear:
-                    type: object
-                    additionalProperties: true
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          description: Academic year not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "500":
-          $ref: "#/components/responses/InternalError"
+    $ref: "./admin/swagger-admin.yaml#/admin_update_academic_year"
 
   "/auth/verify/request":
-    post:
-      tags: [Auth]
-      summary: Request account activation email
-      description: |
-        User-initiated account activation. If the email exists and is not verified, the server sends an activation link to the email.
-        If the account does not yet have a password, a temporary password will be generated and included in the email.
-        The response is always success to avoid email enumeration.
-      operationId: requestAccountActivation
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email:
-                  type: string
-                  format: email
-            example:
-              email: user@example.com
-      responses:
-        "200":
-          description: Request accepted
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
+    $ref: "./auth/swagger-auth.yaml#/auth_verify_request"
 
   "/thesisGuidance/lecturer/my-students":
-    get:
-      tags: [ThesisGuidance]
-      summary: Lecturer - My supervised students
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: query
-          name: roles
-          required: false
-          schema:
-            type: string
-          description: Comma-separated ThesisRole filter (e.g., SUPERVISOR_1,EXAMINER_1); defaults to SUPERVISOR_1,SUPERVISOR_2
-      responses:
-        "200":
-          description: List of supervised students
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  count: { type: integer }
-                  students:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/MyStudentItem"
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_my_students"
 
   "/thesisGuidance/lecturer/requests":
-    get:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Pending guidance requests
-      security: [{ bearerAuth: [] }]
-      responses:
-        "200":
-          description: Requests
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  count: { type: integer }
-                  requests:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/GuidanceItem"
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_requests"
 
   "/thesisGuidance/lecturer/requests/{guidanceId}/reject":
-    patch:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Reject guidance request
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: guidanceId
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/FeedbackBody" }
-      responses:
-        "200":
-          description: Rejected
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  guidance: { $ref: "#/components/schemas/GuidanceItem" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/BadRequest" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_requests_reject"
 
   "/thesisGuidance/lecturer/requests/{guidanceId}/approve":
-    patch:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Approve guidance request
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: guidanceId
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/ApproveGuidanceBody" }
-      responses:
-        "200":
-          description: Approved
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  guidance: { $ref: "#/components/schemas/GuidanceItem" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/BadRequest" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_requests_approve"
 
   "/thesisGuidance/lecturer/progress":
-    get:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Progress summary of supervised students
-      security: [{ bearerAuth: [] }]
-      responses:
-        "200":
-          description: Summary
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  totalComponents: { type: integer }
-                  items:
-                    type: array
-                    items: { $ref: "#/components/schemas/ProgressSummaryItem" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_progress"
 
   "/thesisGuidance/lecturer/progress/{studentId}":
-    get:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Progress detail for a student
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: studentId
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Detail
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  thesisId: { type: string }
-                  components:
-                    type: array
-                    items: { $ref: "#/components/schemas/ProgressDetailItem" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/BadRequest" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_progress_detail"
 
   "/thesisGuidance/lecturer/progress/{studentId}/approve":
-    patch:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Validate progress components
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: studentId
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/ApproveComponentsBody" }
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  thesisId: { type: string }
-                  updated: { type: integer }
-                  created: { type: integer }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_progress_approve_components"
 
   "/thesisGuidance/lecturer/feedback/{guidanceId}":
-    post:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Provide feedback for a guidance session
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: guidanceId
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/FeedbackBody" }
-      responses:
-        "200":
-          description: Posted
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  guidance: { $ref: "#/components/schemas/GuidanceItem" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/BadRequest" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_feedback"
 
   "/thesisGuidance/lecturer/progress/{studentId}/final-approval":
-    patch:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Final approve (100%)
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: studentId
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Approved
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  thesisId: { type: string }
-                  approved: { type: boolean }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/BadRequest" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_final_approval"
 
   "/thesisGuidance/lecturer/guidance-history/{studentId}":
-    get:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Guidance history (optional)
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: studentId
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: History
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  count: { type: integer }
-                  items:
-                    type: array
-                    items: { $ref: "#/components/schemas/GuidanceItem" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_guidance_history"
 
   "/thesisGuidance/lecturer/activity-log/{studentId}":
-    get:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Activity log (optional)
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: studentId
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Logs
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  count: { type: integer }
-                  items:
-                    type: array
-                    items: { $ref: "#/components/schemas/ActivityLogItem" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_activity_log"
 
   "/thesisGuidance/lecturer/supervisor/eligibility":
-    get:
-      tags: [ThesisGuidance]
-      summary: Lecturer - Check eligibility to be SUPERVISOR_1
-      description: Returns whether the lecturer has graduated enough students as SUPERVISOR_2.
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: query
-          name: threshold
-          required: false
-          schema: { type: integer, default: 4 }
-          description: Override required number of SUPERVISOR_2 graduations
-      responses:
-        "200":
-          description: Eligibility result
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  eligible: { type: boolean }
-                  graduatedAsSup2: { type: integer }
-                  required: { type: integer }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+    $ref: "./thesisGuidance/lecturer.yaml#/lecturer_supervisor_eligibility"
+
+  "/thesisGuidance/student/guidance":
+    $ref: "./thesisGuidance/student.yaml#/student_guidance_list"
+
+  "/thesisGuidance/student/guidance/{guidanceId}":
+    $ref: "./thesisGuidance/student.yaml#/student_guidance_detail"
+
+  "/thesisGuidance/student/guidance/request":
+    $ref: "./thesisGuidance/student.yaml#/student_guidance_request"
+
+  "/thesisGuidance/student/guidance/{guidanceId}/reschedule":
+    $ref: "./thesisGuidance/student.yaml#/student_guidance_reschedule"
+
+  "/thesisGuidance/student/guidance/{guidanceId}/cancel":
+    $ref: "./thesisGuidance/student.yaml#/student_guidance_cancel"
+
+  "/thesisGuidance/student/guidance/{guidanceId}/notes":
+    $ref: "./thesisGuidance/student.yaml#/student_guidance_notes"
+
+  "/thesisGuidance/student/progress":
+    $ref: "./thesisGuidance/student.yaml#/student_progress_detail"
+
+  "/thesisGuidance/student/progress/complete":
+    $ref: "./thesisGuidance/student.yaml#/student_progress_complete"
+
+  "/thesisGuidance/student/history":
+    $ref: "./thesisGuidance/student.yaml#/student_history"
+
+  "/thesisGuidance/student/activity-log":
+    $ref: "./thesisGuidance/student.yaml#/student_activity_log"
+
+  "/thesisGuidance/student/supervisors":
+    $ref: "./thesisGuidance/student.yaml#/student_supervisors"
 
 components:
   schemas:
@@ -1094,10 +203,19 @@ components:
         thesisId: { type: string }
         supervisorId: { type: string, nullable: true }
         status: { type: string }
+        meetingUrl: { type: string, nullable: true }
+        supervisorFeedback: { type: string, nullable: true }
+        schedule:
+          $ref: "#/components/schemas/GuidanceScheduleItem"
         student:
           type: object
           nullable: true
           additionalProperties: true
+    GuidanceScheduleItem:
+      type: object
+      properties:
+        id: { type: string }
+        guidanceDate: { type: string, format: date-time, nullable: true }
     ProgressSummaryItem:
       type: object
       properties:
@@ -1121,6 +239,40 @@ components:
         activity: { type: string }
         notes: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
+    SupervisorItem:
+      type: object
+      properties:
+        lecturerId: { type: string }
+        role: { type: string, nullable: true }
+        user:
+          type: object
+          nullable: true
+          additionalProperties: true
+    StudentRequestGuidanceBody:
+      type: object
+      required: [guidanceDate]
+      properties:
+        guidanceDate: { type: string, format: date-time }
+        studentNotes: { type: string }
+    StudentRescheduleGuidanceBody:
+      type: object
+      required: [guidanceDate]
+      properties:
+        guidanceDate: { type: string, format: date-time }
+        studentNotes: { type: string }
+    StudentNotesBody:
+      type: object
+      required: [studentNotes]
+      properties:
+        studentNotes: { type: string }
+    StudentCompleteComponentsBody:
+      type: object
+      required: [componentIds]
+      properties:
+        componentIds:
+          type: array
+          items: { type: string }
+        completedAt: { type: string, format: date-time }
     UpdateUserRequest:
       type: object
       properties:
@@ -1285,16 +437,6 @@ components:
           type: string
         newPassword:
           type: string
-    UserSample:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        email:
-          type: string
-          format: email
     NotificationSample:
       type: object
       properties:

@@ -1,4 +1,5 @@
 import { importStudentsCsvFromUpload, adminUpdateUser, createAcademicYear, updateAcademicYear } from "../services/adminfeatures.service.js";
+import { adminCreateUser } from "../services/user.service.js";
 
 export async function importStudentsCsv(req, res, next) {
 	try {
@@ -26,6 +27,17 @@ export async function updateUserByAdmin(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+export async function createUserByAdminController(req, res, next) {
+	try {
+		const body = req.validated ?? req.body ?? {};
+		const { fullName, email, roles, identityNumber, identityType } = body;
+		const result = await adminCreateUser({ fullName, email, roles, identityNumber, identityType });
+		res.status(201).json({ success: true, user: result });
+	} catch (err) {
+		next(err);
+	}
 }
 
 export async function createAcademicYearController(req, res, next) {

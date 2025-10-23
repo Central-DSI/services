@@ -1,0 +1,223 @@
+# Path Item Objects for AdminFeatures endpoints
+
+admin_import_students:
+  post:
+    tags: [AdminFeatures]
+    summary: Admin - Import students from CSV
+    description: |
+      Upload a CSV to import student accounts.
+      - Required headers: nim, nama, email
+      - Optional header: sks_completed
+      - Rows with existing email are skipped (no updates)
+      - New users are created with password=null and isVerified=false
+      - Assigns role "student" and creates Student with enrollmentYear derived from NIM
+      - Supports separator "," or ";" automatically
+    operationId: adminImportStudentsCsv
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file]
+            properties:
+              file:
+                type: string
+                format: binary
+          encoding:
+            file:
+              contentType: text/csv
+    responses:
+      "200":
+        description: Import summary
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                summary:
+                  $ref: "../openapi.yaml#/components/schemas/ImportStudentsSummary"
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_update_user:
+  patch:
+    tags: [AdminFeatures]
+    summary: Admin - Update user and add roles
+    description: |
+      Update a user's data and add (non-admin) roles without removing existing ones.
+      Notes:
+      - The 'admin' role will not be granted or removed by this endpoint.
+      - If the resulting roles include 'student' or identityType is NIM, a Student record is ensured.
+      - If lecturer-related roles are used or identityType is NIP, a Lecturer record is ensured.
+    operationId: adminUpdateUser
+    security:
+      - bearerAuth: []
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: User id (UUID)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/UpdateUserRequest"
+          example:
+            fullName: "Budi Santoso"
+            email: "budi@example.com"
+            roles:
+              - name: "student"
+                status: "active"
+              - name: "pembimbing 1"
+                status: "nonActive"
+            identityNumber: "2211529999"
+            identityType: "NIM"
+            isVerified: true
+    responses:
+      "200":
+        description: Updated user
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                user:
+                  type: object
+                  description: Updated user with roles/student/lecturer relations
+                  additionalProperties: true
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "404":
+        description: User not found
+        content:
+          application/json:
+            schema: { $ref: "../openapi.yaml#/components/schemas/ErrorResponse" }
+      "409": { $ref: "../openapi.yaml#/components/responses/Conflict" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_create_user:
+  post:
+    tags: [AdminFeatures]
+    summary: Admin - Create user and assign roles
+    description: |
+      Create a new user account and assign roles. 'admin' role is ignored.
+      A temporary password is generated and an activation email is sent.
+    operationId: adminCreateUser
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/CreateUserRequest"
+    responses:
+      "201":
+        description: User created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                user:
+                  $ref: "../openapi.yaml#/components/schemas/CreateUserResponse/properties/user"
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "409": { $ref: "../openapi.yaml#/components/responses/Conflict" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_create_academic_year:
+  post:
+    tags: [AdminFeatures]
+    summary: Admin - Create academic year
+    operationId: adminCreateAcademicYear
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/CreateAcademicYearRequest"
+          example:
+            semester: ganjil
+            year: 2025
+            startDate: "2025-08-01T00:00:00.000Z"
+            endDate: "2026-01-31T00:00:00.000Z"
+    responses:
+      "201":
+        description: Academic year created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                academicYear:
+                  type: object
+                  additionalProperties: true
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "409": { $ref: "../openapi.yaml#/components/responses/Conflict" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_update_academic_year:
+  patch:
+    tags: [AdminFeatures]
+    summary: Admin - Update academic year
+    operationId: adminUpdateAcademicYear
+    security:
+      - bearerAuth: []
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+        description: Academic year id (UUID)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/UpdateAcademicYearRequest"
+          example:
+            semester: genap
+            year: 2026
+            startDate: "2026-02-01T00:00:00.000Z"
+            endDate: "2026-07-31T00:00:00.000Z"
+    responses:
+      "200":
+        description: Academic year updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                academicYear: { type: object, additionalProperties: true }
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "404":
+        description: Academic year not found
+        content:
+          application/json:
+            schema: { $ref: "../openapi.yaml#/components/schemas/ErrorResponse" }
+      "409": { $ref: "../openapi.yaml#/components/responses/Conflict" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }

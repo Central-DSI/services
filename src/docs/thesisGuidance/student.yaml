@@ -1,0 +1,278 @@
+# Path Item Objects for Student Thesis Guidance endpoints
+
+student_guidance_list:
+  get:
+    tags: [StudentThesisGuidance]
+    summary: Student - List my guidance sessions
+    security: [{ bearerAuth: [] }]
+    parameters:
+      - in: query
+        name: status
+        required: false
+        schema: { type: string, enum: [scheduled, completed, cancelled] }
+    responses:
+      "200":
+        description: List
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                count: { type: integer }
+                items:
+                  type: array
+                  items: { $ref: "../openapi.yaml#/components/schemas/GuidanceItem" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+
+student_guidance_detail:
+  get:
+    tags: [StudentThesisGuidance]
+    summary: Student - Guidance detail
+    security: [{ bearerAuth: [] }]
+    parameters:
+      - in: path
+        name: guidanceId
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Detail
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                guidance: { $ref: "../openapi.yaml#/components/schemas/GuidanceItem" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "404": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+
+student_guidance_request:
+  post:
+    tags: [StudentThesisGuidance]
+    summary: Student - Request a guidance session
+    security: [{ bearerAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../openapi.yaml#/components/schemas/StudentRequestGuidanceBody" }
+    responses:
+      "201":
+        description: Created
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                guidance: { $ref: "../openapi.yaml#/components/schemas/GuidanceItem" }
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+
+student_guidance_reschedule:
+  patch:
+    tags: [StudentThesisGuidance]
+    summary: Student - Reschedule guidance
+    security: [{ bearerAuth: [] }]
+    parameters:
+      - in: path
+        name: guidanceId
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../openapi.yaml#/components/schemas/StudentRescheduleGuidanceBody" }
+    responses:
+      "200":
+        description: Updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                guidance: { $ref: "../openapi.yaml#/components/schemas/GuidanceItem" }
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "404": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+
+student_guidance_cancel:
+  patch:
+    tags: [StudentThesisGuidance]
+    summary: Student - Cancel guidance
+    security: [{ bearerAuth: [] }]
+    parameters:
+      - in: path
+        name: guidanceId
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              reason: { type: string }
+    responses:
+      "200":
+        description: Cancelled
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                guidance: { $ref: "../openapi.yaml#/components/schemas/GuidanceItem" }
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "404": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+
+student_guidance_notes:
+  post:
+    tags: [StudentThesisGuidance]
+    summary: Student - Update notes for a guidance
+    security: [{ bearerAuth: [] }]
+    parameters:
+      - in: path
+        name: guidanceId
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../openapi.yaml#/components/schemas/StudentNotesBody" }
+    responses:
+      "200":
+        description: Updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                guidance: { $ref: "../openapi.yaml#/components/schemas/GuidanceItem" }
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "404": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+
+student_progress_detail:
+  get:
+    tags: [StudentThesisGuidance]
+    summary: Student - My progress detail
+    security: [{ bearerAuth: [] }]
+    responses:
+      "200":
+        description: Detail
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                thesisId: { type: string }
+                components:
+                  type: array
+                  items: { $ref: "../openapi.yaml#/components/schemas/ProgressDetailItem" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+
+student_progress_complete:
+  patch:
+    tags: [StudentThesisGuidance]
+    summary: Student - Mark components completed
+    security: [{ bearerAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "../openapi.yaml#/components/schemas/StudentCompleteComponentsBody" }
+    responses:
+      "200":
+        description: Updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                thesisId: { type: string }
+                updated: { type: integer }
+                created: { type: integer }
+  "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+  "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+  "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+
+student_history:
+  get:
+    tags: [StudentThesisGuidance]
+    summary: Student - Guidance history
+    security: [{ bearerAuth: [] }]
+    responses:
+      "200":
+        description: History
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                count: { type: integer }
+                items:
+                  type: array
+                  items: { $ref: "../openapi.yaml#/components/schemas/GuidanceItem" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+
+student_activity_log:
+  get:
+    tags: [StudentThesisGuidance]
+    summary: Student - Activity log
+    security: [{ bearerAuth: [] }]
+    responses:
+      "200":
+        description: Logs
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                count: { type: integer }
+                items:
+                  type: array
+                  items: { $ref: "../openapi.yaml#/components/schemas/ActivityLogItem" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+
+student_supervisors:
+  get:
+    tags: [StudentThesisGuidance]
+    summary: Student - My supervisors
+    security: [{ bearerAuth: [] }]
+    responses:
+      "200":
+        description: Supervisors
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                thesisId: { type: string }
+                supervisors:
+                  type: array
+                  items: { $ref: "../openapi.yaml#/components/schemas/SupervisorItem" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }

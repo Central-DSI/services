@@ -5,7 +5,6 @@ import { fileURLToPath, pathToFileURL } from "url";
 import path from "path";
 import fs from "fs";
 import swaggerUi from "swagger-ui-express";
-import YAML from "yamljs";
 import errorHandler from "./middlewares/error.middleware.js";
 
 const app = express();
@@ -20,12 +19,18 @@ const __dirname = path.dirname(__filename);
 
 // Swagger UI (serve OpenAPI spec at /docs)
 try {
-  const openapiPath = path.join(__dirname, "docs", "openapi.yaml");
-  const openapiSpec = YAML.load(openapiPath);
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
+  const docsDir = path.join(__dirname, "docs");
+  // Serve the raw YAML and referenced fragments so the browser can resolve $ref URLs
+  app.use("/docs", express.static(docsDir));
+  // Configure Swagger UI to fetch the YAML by URL, enabling client-side $ref resolution
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(null, { swaggerOptions: { url: "/docs/openapi.yaml" } })
+  );
   console.log("📚 Swagger UI available at /docs");
 } catch (err) {
-  console.warn("⚠️ Swagger UI disabled — failed to load OpenAPI spec:", err.message);
+  console.warn("⚠️ Swagger UI disabled — failed to initialize Swagger UI:", err.message);
 }
 
 // Auto register semua routes di /routes
