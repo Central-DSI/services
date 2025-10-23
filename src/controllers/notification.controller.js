@@ -1,0 +1,85 @@
+import {
+	getUserNotifications,
+	getUnreadCount,
+	markAsRead,
+	markAllAsRead,
+	deleteNotificationService,
+} from "../services/notification.service.js";
+
+/**
+ * GET /notification - Get user's notifications
+ */
+export async function getNotifications(req, res, next) {
+	try {
+		const userId = req.user.sub;
+		const { limit, offset, onlyUnread } = req.query;
+
+		const options = {
+			limit: limit ? parseInt(limit) : 20,
+			offset: offset ? parseInt(offset) : 0,
+			onlyUnread: onlyUnread === "true",
+		};
+
+		const result = await getUserNotifications(userId, options);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * GET /notification/unread-count - Get unread count
+ */
+export async function getUnreadCountController(req, res, next) {
+	try {
+		const userId = req.user.sub;
+		const result = await getUnreadCount(userId);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * PATCH /notification/:id/read - Mark notification as read
+ */
+export async function markNotificationRead(req, res, next) {
+	try {
+		const userId = req.user.sub;
+		const { id } = req.params;
+
+		const result = await markAsRead(id, userId);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * PATCH /notification/read-all - Mark all as read
+ */
+export async function markAllRead(req, res, next) {
+	try {
+		const userId = req.user.sub;
+		const result = await markAllAsRead(userId);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * DELETE /notification/:id - Delete notification
+ */
+export async function deleteNotification(req, res, next) {
+	try {
+		const userId = req.user.sub;
+		const { id } = req.params;
+
+		const result = await deleteNotificationService(id, userId);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+

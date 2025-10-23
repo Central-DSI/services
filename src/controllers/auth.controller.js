@@ -1,4 +1,5 @@
 import { loginWithEmailPassword, refreshTokens, logout, verifyAccessToken, changePassword, requestPasswordReset, verifyPasswordResetToken, resetPasswordWithToken, verifyAccountToken, requestAccountVerification, getUserProfile } from "../services/auth.service.js";
+import { ENV } from "../config/env.js";
 
 export async function login(req, res, next) {
 	try {
@@ -83,14 +84,20 @@ export async function verifyResetToken(req, res, next) {
 	try {
 		const token = req.query?.token || req.body?.token;
 		if (!token) {
-			const err = new Error("Token is required");
-			err.statusCode = 400;
-			throw err;
+			// Redirect ke frontend dengan error
+			const frontendUrl = `${ENV.FRONTEND_URL}/login?reset=error&message=${encodeURIComponent('Token tidak ditemukan')}`;
+			return res.redirect(frontendUrl);
 		}
-		const decoded = await verifyPasswordResetToken(token);
-		res.json({ success: true, tokenValid: true, sub: decoded.sub });
+		// Verify token
+		await verifyPasswordResetToken(token);
+		// Redirect ke halaman reset password frontend dengan token
+		const frontendUrl = `${ENV.FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}`;
+		res.redirect(frontendUrl);
 	} catch (err) {
-		next(err);
+		// Redirect ke frontend dengan error
+		const errorMessage = err.message || 'Token tidak valid atau sudah kadaluarsa';
+		const frontendUrl = `${ENV.FRONTEND_URL}/login?reset=error&message=${encodeURIComponent(errorMessage)}`;
+		res.redirect(frontendUrl);
 	}
 }
 
@@ -113,14 +120,19 @@ export async function verifyAccount(req, res, next) {
 	try {
 		const token = req.query?.token || req.body?.token;
 		if (!token) {
-			const err = new Error("Token is required");
-			err.statusCode = 400;
-			throw err;
+			// Redirect ke frontend dengan error
+			const frontendUrl = `${ENV.FRONTEND_URL}/login?verified=error&message=${encodeURIComponent('Token tidak ditemukan')}`;
+			return res.redirect(frontendUrl);
 		}
 		const result = await verifyAccountToken(token);
-		res.json({ success: true, verified: true, userId: result.userId });
+		// Redirect ke frontend dengan success
+		const frontendUrl = `${ENV.FRONTEND_URL}/login?verified=success&message=${encodeURIComponent('Akun berhasil diaktivasi! Silakan login dengan password yang dikirim ke email Anda.')}`;
+		res.redirect(frontendUrl);
 	} catch (err) {
-		next(err);
+		// Redirect ke frontend dengan error
+		const errorMessage = err.message || 'Terjadi kesalahan saat aktivasi akun';
+		const frontendUrl = `${ENV.FRONTEND_URL}/login?verified=error&message=${encodeURIComponent(errorMessage)}`;
+		res.redirect(frontendUrl);
 	}
 }
 
