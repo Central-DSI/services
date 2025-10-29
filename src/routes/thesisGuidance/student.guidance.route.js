@@ -20,6 +20,7 @@ import {
 	activityLog,
 	listSupervisors,
 } from "../../controllers/thesisGuidance/student.guidance.controller.js";
+import { uploadThesisFile } from "../../middlewares/file.middleware.js";
 
 const router = express.Router();
 
@@ -31,7 +32,9 @@ router.get("/guidance", listMyGuidances);
 router.get("/guidance/:guidanceId", guidanceDetail);
 
 // Create / reschedule / cancel guidance
-router.post("/guidance/request", validate(requestGuidanceSchema), requestGuidance);
+// Accept multipart/form-data with optional thesis file (field name: "file").
+// The upload middleware is placed before validation so multer parses multipart bodies.
+router.post("/guidance/request", uploadThesisFile, validate(requestGuidanceSchema), requestGuidance);
 router.patch("/guidance/:guidanceId/reschedule", validate(rescheduleGuidanceSchema), rescheduleGuidance);
 router.patch("/guidance/:guidanceId/cancel", cancelGuidance);
 

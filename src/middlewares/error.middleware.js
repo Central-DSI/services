@@ -6,14 +6,22 @@ export default function errorHandler(err, req, res, next) {
   if (process.env.NODE_ENV !== "test") {
     console.error("❌ Error:", err.message);
     if (err.stack) console.error(err.stack);
+    // Log detail validasi agar mudah ditrace saat 400
+    if (statusCode === 400 && err.details) {
+      console.error("Validation details:", err.details);
+    }
   }
 
   // Bentuk respons standar JSON
-  res.status(statusCode).json({
+  const payload = {
     success: false,
     status: statusCode,
     message: err.message || "Internal Server Error",
     timestamp: new Date().toISOString(),
     path: req.originalUrl,
-  });
+  };
+  if (statusCode === 400 && err.details) {
+    payload.details = err.details;
+  }
+  res.status(statusCode).json(payload);
 }

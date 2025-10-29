@@ -58,8 +58,30 @@ student_guidance_request:
     requestBody:
       required: true
       content:
-        application/json:
-          schema: { $ref: "../openapi.yaml#/components/schemas/StudentRequestGuidanceBody" }
+        multipart/form-data:
+          schema:
+            type: object
+            required: [guidanceDate, file]
+            properties:
+              guidanceDate:
+                type: string
+                format: date-time
+                description: Preferred guidance datetime (ISO 8601)
+              studentNotes:
+                type: string
+                description: Optional notes from student
+              supervisorId:
+                type: string
+                format: uuid
+                description: Optional specific supervisor to request (must belong to your thesis)
+              meetingUrl:
+                type: string
+                format: uri
+                description: Optional meeting URL (Google Meet/Zoom/etc.)
+              file:
+                type: string
+                format: binary
+                description: Thesis document (PDF/DOC/DOCX/TXT, max 50MB)
     responses:
       "201":
         description: Created
@@ -210,9 +232,9 @@ student_progress_complete:
                 thesisId: { type: string }
                 updated: { type: integer }
                 created: { type: integer }
-  "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
-  "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
-  "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "400": { $ref: "../openapi.yaml#/components/responses/BadRequest" }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
 
 student_history:
   get:

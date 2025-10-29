@@ -6,12 +6,15 @@ import path from "path";
 import fs from "fs";
 import swaggerUi from "swagger-ui-express";
 import errorHandler from "./middlewares/error.middleware.js";
+import dateFormatMiddleware from "./middlewares/dateFormat.middleware.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+// Add formatted `<key>Formatted` for any date-like fields in all JSON responses
+app.use(dateFormatMiddleware({ withSeconds: false }));
 
 // Resolve __filename/__dirname once
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +34,18 @@ try {
   console.log("📚 Swagger UI available at /docs");
 } catch (err) {
   console.warn("⚠️ Swagger UI disabled — failed to initialize Swagger UI:", err.message);
+}
+
+// Serve uploaded files statically (e.g., thesis files)
+try {
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
+  console.log("📁 Serving uploads at /uploads");
+} catch (err) {
+  console.warn("⚠️ Failed to set up static uploads serving:", err.message);
 }
 
 // Auto register semua routes di /routes

@@ -14,8 +14,18 @@ function csvFileFilter(req, file, cb) {
 	cb(null, true);
 }
 
-const upload = multer({ storage, fileFilter: csvFileFilter, limits: { fileSize: 10 * 1024 * 1024 } });
+function thesisFileFilter(req, file, cb) {
+	// Restrict thesis uploads to PDF only so they can be previewed inline
+	const isPdf = file.mimetype === "application/pdf" || (file.originalname || "").toLowerCase().endsWith(".pdf");
+	if (!isPdf) return cb(new Error("Only PDF files are allowed for thesis uploads"));
+	cb(null, true);
+}
+
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const thesisUpload = multer({ storage, fileFilter: thesisFileFilter, limits: { fileSize: 50 * 1024 * 1024 } });
 
 export const uploadCsv = upload.single("file");
+export const uploadThesisFile = thesisUpload.single("file");
+
 export default upload;
 

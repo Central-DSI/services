@@ -63,6 +63,19 @@ export async function createNotification(data) {
 }
 
 /**
+ * Create many notifications at once
+ * @param {Array<{ userId: string, title?: string, message?: string }>} dataArray
+ */
+export async function createNotificationsMany(dataArray = []) {
+	if (!Array.isArray(dataArray) || dataArray.length === 0) {
+		return { count: 0 };
+	}
+	return await prisma.notification.createMany({
+		data: dataArray,
+	});
+}
+
+/**
  * Delete a notification
  * @param {string} notificationId
  * @param {string} userId

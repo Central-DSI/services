@@ -53,9 +53,17 @@ export async function findGuidanceRequests(lecturerId) {
 		where: {
 			supervisorId: lecturerId,
 			status: "scheduled",
-			supervisorFeedback: null,
+			// consider both null and empty string as "no feedback yet" (pending)
+			OR: [
+				{ supervisorFeedback: null },
+				{ supervisorFeedback: "" },
+			],
 		},
-		orderBy: { id: "asc" },
+		// newest-first by schedule date, fallback by id desc
+		orderBy: [
+			{ schedule: { guidanceDate: "desc" } },
+			{ id: "desc" },
+		],
 		include: {
 			thesis: {
 				include: {

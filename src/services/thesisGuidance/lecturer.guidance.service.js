@@ -28,6 +28,25 @@ function ensureLecturer(lecturer) {
 	}
 }
 
+// Normalize a guidance record into a flat, tidy shape
+function toFlatGuidance(g) {
+  if (!g) return null;
+  return {
+    id: g.id,
+    thesisId: g.thesisId || g.thesis?.id || null,
+    studentId: g.thesis?.studentId || g.thesis?.student?.id || null,
+    studentName: g.thesis?.student?.user?.fullName || null,
+    status: g.status,
+    scheduledAt: g?.schedule?.guidanceDate || null,
+    schedule: g?.schedule ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate } : null,
+    supervisorId: g.supervisorId || null,
+    supervisorName: g?.supervisor?.user?.fullName || null,
+    meetingUrl: g.meetingUrl || null,
+    notes: g.studentNotes || null,
+    supervisorFeedback: g.supervisorFeedback || null,
+  };
+}
+
 export async function getMyStudentsService(userId, roles) {
 	const lecturer = await getLecturerByUserId(userId);
 	ensureLecturer(lecturer);
@@ -43,7 +62,8 @@ export async function getRequestsService(userId) {
 	const lecturer = await getLecturerByUserId(userId);
 	ensureLecturer(lecturer);
 	const requests = await findGuidanceRequests(lecturer.id);
-	return { count: requests.length, requests };
+	const items = Array.isArray(requests) ? requests.map((g) => toFlatGuidance(g)) : [];
+	return { count: items.length, requests: items };
 }
 
 export async function rejectGuidanceService(userId, guidanceId, { feedback } = {}) {
@@ -55,9 +75,11 @@ export async function rejectGuidanceService(userId, guidanceId, { feedback } = {
 		err.statusCode = 404;
 		throw err;
 	}
-	const updated = await rejectGuidanceById(guidanceId, { feedback });
-	await logThesisActivity(updated.thesisId, userId, "GUIDANCE_REJECTED", feedback || undefined);
-	return { guidance: updated };
+	await rejectGuidanceById(guidanceId, { feedback });
+	// Re-read with includes for a complete, flat response
+	const fresh = await findGuidanceByIdForLecturer(guidanceId, lecturer.id);
+	await logThesisActivity(fresh.thesisId, userId, "GUIDANCE_REJECTED", feedback || undefined);
+	return { guidance: toFlatGuidance(fresh) };
 }
 
 export async function approveGuidanceService(userId, guidanceId, { feedback, meetingUrl } = {}) {
@@ -69,9 +91,11 @@ export async function approveGuidanceService(userId, guidanceId, { feedback, mee
 		err.statusCode = 404;
 		throw err;
 	}
-	const updated = await approveGuidanceById(guidanceId, { feedback, meetingUrl });
-	await logThesisActivity(updated.thesisId, userId, "GUIDANCE_APPROVED", feedback || undefined);
-	return { guidance: updated };
+	await approveGuidanceById(guidanceId, { feedback, meetingUrl });
+	// Re-read with includes for a complete, flat response
+	const fresh = await findGuidanceByIdForLecturer(guidanceId, lecturer.id);
+	await logThesisActivity(fresh.thesisId, userId, "GUIDANCE_APPROVED", feedback || undefined);
+	return { guidance: toFlatGuidance(fresh) };
 }
 
 export async function getAllProgressService(userId) {
@@ -131,9 +155,10 @@ export async function postGuidanceFeedbackService(userId, guidanceId, { feedback
 		err.statusCode = 404;
 		throw err;
 	}
-	const updated = await approveGuidanceById(guidanceId, { feedback });
-	await logThesisActivity(updated.thesisId, userId, "GUIDANCE_FEEDBACK", feedback || undefined);
-	return { guidance: updated };
+	await approveGuidanceById(guidanceId, { feedback });
+	const fresh = await findGuidanceByIdForLecturer(guidanceId, lecturer.id);
+	await logThesisActivity(fresh.thesisId, userId, "GUIDANCE_FEEDBACK", feedback || undefined);
+	return { guidance: toFlatGuidance(fresh) };
 }
 
 export async function finalApprovalService(userId, studentId) {
@@ -161,7 +186,8 @@ export async function finalApprovalService(userId, studentId) {
 export async function guidanceHistoryService(userId, studentId) {
 	const lecturer = await getLecturerByUserId(userId);
 	ensureLecturer(lecturer);
-	const items = await listGuidanceHistory(studentId, lecturer.id);
+	const rows = await listGuidanceHistory(studentId, lecturer.id);
+	const items = rows.map((g) => toFlatGuidance(g));
 	return { count: items.length, items };
 }
 

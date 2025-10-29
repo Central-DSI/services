@@ -15,6 +15,63 @@ import {
   upsertStudentCompletions,
 } from "../../repositories/thesisGuidance/student.guidance.repository.js";
 
+import prisma from "../../config/prisma.js";
+import { wsSendToUser } from "../../config/ws.js";
+import { createNotificationsForUsers } from "../notification.service.js";
+import fs from "fs";
+import path from "path";
+import { promisify } from "util";
+const writeFile = promisify(fs.writeFile);
+const mkdir = promisify(fs.mkdir);
+
+async function ensureThesisAcademicYear(thesis) {
+  if (thesis.academicYearId) return thesis;
+  // Try to attach current academic year based on date window, else latest by year
+  const now = new Date();
+  const current = await prisma.academicYear.findFirst({
+    where: {
+      OR: [
+        { AND: [{ startDate: { lte: now } }, { endDate: { gte: now } }] },
+        // fallback: any with startDate <= now or endDate >= now
+        { startDate: { lte: now } },
+        { endDate: { gte: now } },
+      ],
+    },
+    orderBy: [
+      { year: "desc" },
+      { startDate: "desc" },
+    ],
+  });
+  if (current) {
+    await prisma.thesis.update({ where: { id: thesis.id }, data: { academicYearId: current.id } });
+    return { ...thesis, academicYearId: current.id };
+  }
+  return thesis;
+}
+
+async function getOrCreateDocumentType(name = "Thesis") {
+  let dt = await prisma.documentType.findFirst({ where: { name } });
+  if (!dt) {
+    dt = await prisma.documentType.create({ data: { name } });
+  }
+  return dt;
+}
+
+async function logThesisActivity(thesisId, userId, activity, notes) {
+  try {
+    await prisma.thesisActivityLog.create({
+      data: {
+        thesisId,
+        userId,
+        activity,
+        notes: notes || "",
+      },
+    });
+  } catch (e) {
+    console.error("Failed to create thesis activity log:", e?.message || e);
+  }
+}
+
 function ensureStudent(student) {
   if (!student) {
     const err = new Error("Student profile not found for this user");
@@ -37,8 +94,41 @@ async function getActiveThesisOrThrow(userId) {
 
 export async function listMyGuidancesService(userId, status) {
   const { thesis } = await getActiveThesisOrThrow(userId);
-  const items = await listGuidancesForThesis(thesis.id, status);
-  return { count: items.length, items };
+  const rows = await listGuidancesForThesis(thesis.id, status);
+  // Defensive: ensure newest-first by schedule date on the service layer as well
+  rows.sort((a, b) => {
+    const at = a?.schedule?.guidanceDate ? new Date(a.schedule.guidanceDate).getTime() : 0;
+    const bt = b?.schedule?.guidanceDate ? new Date(b.schedule.guidanceDate).getTime() : 0;
+    if (bt !== at) return bt - at;
+    // tie-breaker by id desc
+    return String(b.id).localeCompare(String(a.id));
+  });
+  const items = rows.map((g) => ({
+    id: g.id,
+    status: g.status,
+    scheduledAt: g?.schedule?.guidanceDate || null,
+    schedule: g?.schedule
+      ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate }
+      : null,
+    supervisorId: g.supervisorId || null,
+    supervisorName: g?.supervisor?.user?.fullName || null,
+  }));
+  // attach thesis document (same for all rows)
+  let doc = null;
+  try {
+    const t = await prisma.thesis.findUnique({ where: { id: thesis.id }, include: { document: true } });
+    if (t?.document) {
+      doc = {
+        id: t.document.id,
+        fileName: t.document.fileName,
+        filePath: t.document.filePath, // relative path served under /uploads
+      };
+    }
+  } catch (e) {
+    console.warn("Failed to load thesis document:", e?.message || e);
+  }
+  const withDoc = items.map((it) => ({ ...it, document: doc }));
+  return { count: withDoc.length, items: withDoc };
 }
 
 export async function getGuidanceDetailService(userId, guidanceId) {
@@ -50,18 +140,54 @@ export async function getGuidanceDetailService(userId, guidanceId) {
     err.statusCode = 404;
     throw err;
   }
-  return { guidance };
+  const flat = {
+    id: guidance.id,
+    status: guidance.status,
+    scheduledAt: guidance?.schedule?.guidanceDate || null,
+    schedule: guidance?.schedule
+      ? { id: guidance.schedule.id, guidanceDate: guidance.schedule.guidanceDate }
+      : null,
+    supervisorId: guidance.supervisorId || null,
+    supervisorName: guidance?.supervisor?.user?.fullName || null,
+    meetingUrl: guidance.meetingUrl || null,
+    notes: guidance.studentNotes || null,
+    supervisorFeedback: guidance.supervisorFeedback || null,
+  };
+  // attach thesis document
+  try {
+    const t = await prisma.thesis.findUnique({ where: { id: guidance.thesisId }, include: { document: true } });
+    if (t?.document) {
+      flat.document = {
+        id: t.document.id,
+        fileName: t.document.fileName,
+        filePath: t.document.filePath,
+      };
+    }
+  } catch {}
+  return { guidance: flat };
 }
 
-export async function requestGuidanceService(userId, guidanceDate, studentNotes) {
-  const { thesis } = await getActiveThesisOrThrow(userId);
+export async function requestGuidanceService(userId, guidanceDate, studentNotes, file, meetingUrl, supervisorId) {
+  let { thesis } = await getActiveThesisOrThrow(userId);
+  // make sure academic year is set when possible
+  thesis = await ensureThesisAcademicYear(thesis);
   const supervisors = await getSupervisorsForThesis(thesis.id);
-  // prefer pembimbing1 then pembimbing2
+  // prefer provided supervisor, else pembimbing1, then pembimbing2
   const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
   const sup1 = supervisors.find((p) => norm(p.role?.name) === "pembimbing1");
   const sup2 = supervisors.find((p) => norm(p.role?.name) === "pembimbing2");
-  const supervisorId = sup1?.lecturerId || sup2?.lecturerId || null;
-  if (!supervisorId) {
+  let selectedSupervisorId = supervisorId || null;
+  if (selectedSupervisorId) {
+    const allowed = supervisors.some((s) => s.lecturerId === selectedSupervisorId);
+    if (!allowed) {
+      const err = new Error("Invalid supervisorId for this thesis");
+      err.statusCode = 400;
+      throw err;
+    }
+  } else {
+    selectedSupervisorId = sup1?.lecturerId || sup2?.lecturerId || null;
+  }
+  if (!selectedSupervisorId) {
     const err = new Error("No supervisor assigned to this thesis");
     err.statusCode = 400;
     throw err;
@@ -71,13 +197,106 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes)
   const created = await createGuidance({
     thesisId: thesis.id,
     scheduleId: schedule.id,
-    supervisorId,
+    supervisorId: selectedSupervisorId,
     studentNotes: studentNotes || `Request guidance on ${guidanceDate.toISOString()}`,
-    supervisorFeedback: null,
-    meetingUrl: null,
+    supervisorFeedback: "",
+    meetingUrl: meetingUrl || "",
     status: "scheduled",
   });
-  return { guidance: created };
+
+  await logThesisActivity(thesis.id, userId, "request-guidance", `Requested at ${guidanceDate.toISOString()}`);
+
+  // Persist notifications for all supervisors and the student
+  try {
+    const supervisorsUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const dateStr = guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate);
+    await createNotificationsForUsers(supervisorsUserIds, {
+      title: "Permintaan bimbingan baru",
+      message: `Mahasiswa mengajukan bimbingan. Jadwal: ${dateStr}`,
+    });
+    await createNotificationsForUsers([userId], {
+      title: "Permintaan bimbingan dikirim",
+      message: `Pengajuan bimbingan berhasil. Jadwal: ${dateStr}`,
+    });
+  } catch (e) {
+    console.warn("Notify (DB) failed (guidance request):", e?.message || e);
+  }
+
+  // Try to push realtime notifications via WebSocket
+  try {
+    const sup = supervisors.find((p) => p.lecturerId === selectedSupervisorId);
+    const payload = {
+      guidanceId: created.id,
+      thesisId: thesis.id,
+      scheduledAt: schedule?.guidanceDate || null,
+      supervisorId: selectedSupervisorId,
+    };
+    // Notify all supervisors attached to this thesis
+    for (const p of supervisors) {
+      const supervisorUserId = p?.lecturer?.user?.id;
+      if (!supervisorUserId) continue;
+      wsSendToUser(supervisorUserId, "thesis-guidance:requested", {
+        role: "supervisor",
+        ...payload,
+      });
+    }
+    // Also echo to the student who requested (acknowledgement)
+    wsSendToUser(userId, "thesis-guidance:requested", {
+      role: "student",
+      ...payload,
+    });
+  } catch (e) {
+    console.warn("WS notify failed (guidance request):", e?.message || e);
+  }
+
+  // If a thesis file was uploaded, persist it and attach as a Document linked to the thesis
+  if (file && file.buffer) {
+    try {
+      const uploadsRoot = path.join(process.cwd(), "uploads", "thesis", thesis.id);
+      await mkdir(uploadsRoot, { recursive: true });
+      const safeName = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+      const filePath = path.join(uploadsRoot, safeName);
+      await writeFile(filePath, file.buffer);
+
+      // store relative path in DB (web servers may serve /uploads)
+      const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, "/");
+
+      const docType = await getOrCreateDocumentType("Thesis");
+      const doc = await prisma.document.create({
+        data: {
+          userId: userId,
+          documentTypeId: docType.id,
+          filePath: relPath,
+          fileName: file.originalname,
+        },
+      });
+
+      // attach document to thesis (do not change schema; update thesis.documentId)
+      await prisma.thesis.update({ where: { id: thesis.id }, data: { documentId: doc.id } });
+
+      await logThesisActivity(thesis.id, userId, "upload-thesis-document", `Uploaded ${file.originalname}`);
+    } catch (err) {
+      // don't fail the whole request if file storage fails; log then continue
+      console.error("Failed to store uploaded thesis file:", err.message || err);
+    }
+  }
+
+  // Return a flat guidance object consistent with other endpoints
+  const supMap = new Map(supervisors.map((p) => [p.lecturerId, p]));
+  const sup = supMap.get(selectedSupervisorId);
+  const flat = {
+    id: created.id,
+    status: created.status,
+    scheduledAt: schedule?.guidanceDate || null,
+    scheduleId: schedule?.id || null,
+    schedule: schedule ? { id: schedule.id, guidanceDate: schedule.guidanceDate } : null,
+    supervisorId: created.supervisorId || null,
+    supervisorName: sup?.lecturer?.user?.fullName || null,
+    meetingUrl: created.meetingUrl || null,
+    notes: created.studentNotes || null,
+    supervisorFeedback: created.supervisorFeedback || null,
+  };
+  return { guidance: flat };
 }
 
 export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate, studentNotes) {
@@ -102,10 +321,63 @@ export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate
     await updateGuidanceById(guidance.id, { scheduleId: schedule.id });
   }
   const updated = await updateGuidanceById(guidance.id, {
-    studentNotes: studentNotes || guidance.studentNotes || null,
-    supervisorFeedback: null, // back to pending
+    studentNotes: studentNotes || guidance.studentNotes || "",
+    supervisorFeedback: "", // back to pending
   });
-  return { guidance: updated };
+  await logThesisActivity(guidance.thesisId, userId, "reschedule-guidance", `New date ${guidanceDate.toISOString()}`);
+  // Persist notifications
+  try {
+    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
+    const supervisorsUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const dateStr = guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate);
+    await createNotificationsForUsers(supervisorsUserIds, {
+      title: "Jadwal bimbingan dijadwalkan ulang",
+      message: `Mahasiswa menjadwalkan ulang bimbingan ke ${dateStr}`,
+    });
+    await createNotificationsForUsers([userId], {
+      title: "Bimbingan dijadwalkan ulang",
+      message: `Jadwal baru: ${dateStr}`,
+    });
+  } catch (e) {
+    console.warn("Notify (DB) failed (reschedule):", e?.message || e);
+  }
+  // WS notify all supervisors + student
+  try {
+    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
+    const payload = {
+      guidanceId: guidance.id,
+      thesisId: guidance.thesisId,
+      scheduledAt: guidanceDate,
+    };
+    for (const p of supervisors) {
+      const supervisorUserId = p?.lecturer?.user?.id;
+      if (!supervisorUserId) continue;
+      wsSendToUser(supervisorUserId, "thesis-guidance:rescheduled", {
+        role: "supervisor",
+        ...payload,
+      });
+    }
+    wsSendToUser(userId, "thesis-guidance:rescheduled", {
+      role: "student",
+      ...payload,
+    });
+  } catch (e) {
+    console.warn("WS notify failed (guidance reschedule):", e?.message || e);
+  }
+  const flat = {
+    id: updated.id,
+    status: updated.status,
+    scheduledAt: updated?.schedule?.guidanceDate || null,
+    schedule: updated?.schedule
+      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate }
+      : null,
+    supervisorId: updated.supervisorId || null,
+    supervisorName: null,
+    meetingUrl: updated.meetingUrl || null,
+    notes: updated.studentNotes || null,
+    supervisorFeedback: updated.supervisorFeedback || null,
+  };
+  return { guidance: flat };
 }
 
 export async function cancelGuidanceService(userId, guidanceId, reason) {
@@ -122,8 +394,60 @@ export async function cancelGuidanceService(userId, guidanceId, reason) {
     err.statusCode = 400;
     throw err;
   }
-  const updated = await updateGuidanceById(guidance.id, { status: "cancelled", studentNotes: reason || guidance.studentNotes });
-  return { guidance: updated };
+  const updated = await updateGuidanceById(guidance.id, { status: "cancelled", studentNotes: reason || guidance.studentNotes || "" });
+  await logThesisActivity(guidance.thesisId, userId, "cancel-guidance", reason || "");
+  // Persist notifications
+  try {
+    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
+    const supervisorsUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    await createNotificationsForUsers(supervisorsUserIds, {
+      title: "Bimbingan dibatalkan",
+      message: `Mahasiswa membatalkan bimbingan. Alasan: ${reason || "-"}`,
+    });
+    await createNotificationsForUsers([userId], {
+      title: "Bimbingan dibatalkan",
+      message: `Pengajuan bimbingan dibatalkan. ${reason ? "Alasan: " + reason : ""}`,
+    });
+  } catch (e) {
+    console.warn("Notify (DB) failed (cancel):", e?.message || e);
+  }
+  // WS notify all supervisors + student
+  try {
+    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
+    const payload = {
+      guidanceId: guidance.id,
+      thesisId: guidance.thesisId,
+      reason: reason || "",
+    };
+    for (const p of supervisors) {
+      const supervisorUserId = p?.lecturer?.user?.id;
+      if (!supervisorUserId) continue;
+      wsSendToUser(supervisorUserId, "thesis-guidance:cancelled", {
+        role: "supervisor",
+        ...payload,
+      });
+    }
+    wsSendToUser(userId, "thesis-guidance:cancelled", {
+      role: "student",
+      ...payload,
+    });
+  } catch (e) {
+    console.warn("WS notify failed (guidance cancel):", e?.message || e);
+  }
+  const flat = {
+    id: updated.id,
+    status: updated.status,
+    scheduledAt: updated?.schedule?.guidanceDate || null,
+    schedule: updated?.schedule
+      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate }
+      : null,
+    supervisorId: updated.supervisorId || null,
+    supervisorName: null,
+    meetingUrl: updated.meetingUrl || null,
+    notes: updated.studentNotes || null,
+    supervisorFeedback: updated.supervisorFeedback || null,
+  };
+  return { guidance: flat };
 }
 
 export async function updateStudentNotesService(userId, guidanceId, studentNotes) {
@@ -135,8 +459,61 @@ export async function updateStudentNotesService(userId, guidanceId, studentNotes
     err.statusCode = 404;
     throw err;
   }
-  const updated = await updateGuidanceById(guidance.id, { studentNotes });
-  return { guidance: updated };
+  const updated = await updateGuidanceById(guidance.id, { studentNotes: studentNotes || "" });
+  await logThesisActivity(guidance.thesisId, userId, "update-student-notes", studentNotes || "");
+  // Persist notifications
+  try {
+    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
+    const supervisorsUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const preview = (studentNotes || "").slice(0, 120);
+    await createNotificationsForUsers(supervisorsUserIds, {
+      title: "Catatan mahasiswa diperbarui",
+      message: preview ? `Catatan baru: ${preview}` : "Catatan mahasiswa diperbarui",
+    });
+    await createNotificationsForUsers([userId], {
+      title: "Catatan diperbarui",
+      message: preview ? `Catatan: ${preview}` : "Catatan diperbarui",
+    });
+  } catch (e) {
+    console.warn("Notify (DB) failed (notes updated):", e?.message || e);
+  }
+  // WS notify all supervisors + student
+  try {
+    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
+    const payload = {
+      guidanceId: guidance.id,
+      thesisId: guidance.thesisId,
+      notes: studentNotes || "",
+    };
+    for (const p of supervisors) {
+      const supervisorUserId = p?.lecturer?.user?.id;
+      if (!supervisorUserId) continue;
+      wsSendToUser(supervisorUserId, "thesis-guidance:notes-updated", {
+        role: "supervisor",
+        ...payload,
+      });
+    }
+    wsSendToUser(userId, "thesis-guidance:notes-updated", {
+      role: "student",
+      ...payload,
+    });
+  } catch (e) {
+    console.warn("WS notify failed (notes updated):", e?.message || e);
+  }
+  const flat = {
+    id: updated.id,
+    status: updated.status,
+    scheduledAt: updated?.schedule?.guidanceDate || null,
+    schedule: updated?.schedule
+      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate }
+      : null,
+    supervisorId: updated.supervisorId || null,
+    supervisorName: null,
+    meetingUrl: updated.meetingUrl || null,
+    notes: updated.studentNotes || null,
+    supervisorFeedback: updated.supervisorFeedback || null,
+  };
+  return { guidance: flat };
 }
 
 export async function getMyProgressService(userId) {
@@ -163,7 +540,17 @@ export async function completeProgressComponentsService(userId, componentIds, co
 export async function guidanceHistoryService(userId) {
   const student = await getStudentByUserId(userId);
   ensureStudent(student);
-  const items = await listGuidanceHistoryByStudent(student.id);
+  const rows = await listGuidanceHistoryByStudent(student.id);
+  const items = rows.map((g) => ({
+    id: g.id,
+    status: g.status,
+    scheduledAt: g?.schedule?.guidanceDate || null,
+    schedule: g?.schedule
+      ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate }
+      : null,
+    supervisorId: g.supervisorId || null,
+    supervisorName: g?.supervisor?.user?.fullName || null,
+  }));
   return { count: items.length, items };
 }
 
@@ -178,9 +565,10 @@ export async function listSupervisorsService(userId) {
   const { thesis } = await getActiveThesisOrThrow(userId);
   const parts = await getSupervisorsForThesis(thesis.id);
   const supervisors = parts.map((p) => ({
-    lecturerId: p.lecturerId,
+    id: p.lecturerId,
+    name: p.lecturer?.user?.fullName || null,
+    email: p.lecturer?.user?.email || null,
     role: p.role?.name || null,
-    user: p.lecturer?.user || null,
   }));
   return { thesisId: thesis.id, supervisors };
 }

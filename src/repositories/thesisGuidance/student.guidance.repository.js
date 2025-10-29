@@ -33,7 +33,11 @@ export function listGuidancesForThesis(thesisId, status) {
   return prisma.thesisGuidance.findMany({
     where,
     include: { schedule: true, supervisor: { include: { user: true } } },
-    orderBy: { id: "asc" },
+    orderBy: [
+      // newest schedule first; fallback to newest id
+      { schedule: { guidanceDate: "desc" } },
+      { id: "desc" },
+    ],
   });
 }
 
@@ -68,7 +72,10 @@ export function listGuidanceHistoryByStudent(studentId) {
   return prisma.thesisGuidance.findMany({
     where: { thesis: { studentId } },
     include: { schedule: true, supervisor: { include: { user: true } } },
-    orderBy: { id: "asc" },
+    orderBy: [
+      { schedule: { guidanceDate: "desc" } },
+      { id: "desc" },
+    ],
   });
 }
 
