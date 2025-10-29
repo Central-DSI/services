@@ -64,6 +64,17 @@ export const ENV = {
   // ===============================
   APP_NAME: process.env.APP_NAME || "Backend API",
   APP_OWNER: process.env.APP_OWNER || "Orang Sigma",
+
+  // ===============================
+  // 🔔 FCM (Firebase Cloud Messaging)
+  // ===============================
+  // Pilih salah satu cara konfigurasi kredensial Admin SDK:
+  // 1) FCM_SERVICE_ACCOUNT_JSON -> string JSON service account utuh
+  // 2) Atau tiga variabel terpisah di bawah
+  FCM_SERVICE_ACCOUNT_JSON: process.env.FCM_SERVICE_ACCOUNT_JSON || "",
+  FCM_PROJECT_ID: process.env.FCM_PROJECT_ID || "",
+  FCM_CLIENT_EMAIL: process.env.FCM_CLIENT_EMAIL || "",
+  FCM_PRIVATE_KEY: process.env.FCM_PRIVATE_KEY || "",
 };
 
 // 🚨 Validasi sederhana: pastikan variabel penting terisi

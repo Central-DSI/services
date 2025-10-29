@@ -5,6 +5,7 @@ import {
 	markAllAsRead,
 	deleteNotificationService,
 } from "../services/notification.service.js";
+import { registerFcmToken, unregisterFcmToken } from "../services/push.service.js";
 
 /**
  * GET /notification - Get user's notifications
@@ -77,6 +78,44 @@ export async function deleteNotification(req, res, next) {
 		const { id } = req.params;
 
 		const result = await deleteNotificationService(id, userId);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * POST /notification/fcm/register - Register FCM token for this user
+ */
+export async function registerFcm(req, res, next) {
+	try {
+		const userId = req.user.sub;
+		const { token } = req.body || {};
+		if (!token) {
+			const e = new Error("token is required");
+			e.statusCode = 400;
+			throw e;
+		}
+		const result = await registerFcmToken(userId, token);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+/**
+ * DELETE /notification/fcm/unregister - Unregister FCM token for this user
+ */
+export async function unregisterFcm(req, res, next) {
+	try {
+		const userId = req.user.sub;
+		const { token } = req.body || {};
+		if (!token) {
+			const e = new Error("token is required");
+			e.statusCode = 400;
+			throw e;
+		}
+		const result = await unregisterFcmToken(userId, token);
 		res.json({ success: true, ...result });
 	} catch (err) {
 		next(err);

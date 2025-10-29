@@ -16,7 +16,8 @@ import {
 } from "../../repositories/thesisGuidance/student.guidance.repository.js";
 
 import prisma from "../../config/prisma.js";
-import { wsSendToUser } from "../../config/ws.js";
+// Replace WebSocket realtime with FCM push notifications
+import { sendFcmToUsers } from "../../services/push.service.js";
 import { createNotificationsForUsers } from "../notification.service.js";
 import fs from "fs";
 import path from "path";
@@ -222,31 +223,29 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
     console.warn("Notify (DB) failed (guidance request):", e?.message || e);
   }
 
-  // Try to push realtime notifications via WebSocket
+  // Push realtime via FCM to all supervisors and the student
   try {
-    const sup = supervisors.find((p) => p.lecturerId === selectedSupervisorId);
-    const payload = {
-      guidanceId: created.id,
-      thesisId: thesis.id,
-      scheduledAt: schedule?.guidanceDate || null,
-      supervisorId: selectedSupervisorId,
+    const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const data = {
+      type: "thesis-guidance:requested",
+      role: "supervisor",
+      guidanceId: String(created.id),
+      thesisId: String(thesis.id),
+      scheduledAt: schedule?.guidanceDate ? new Date(schedule.guidanceDate).toISOString() : "",
+      supervisorId: String(selectedSupervisorId),
     };
-    // Notify all supervisors attached to this thesis
-    for (const p of supervisors) {
-      const supervisorUserId = p?.lecturer?.user?.id;
-      if (!supervisorUserId) continue;
-      wsSendToUser(supervisorUserId, "thesis-guidance:requested", {
-        role: "supervisor",
-        ...payload,
-      });
-    }
-    // Also echo to the student who requested (acknowledgement)
-    wsSendToUser(userId, "thesis-guidance:requested", {
-      role: "student",
-      ...payload,
+    await sendFcmToUsers(supUserIds, {
+      title: "Permintaan bimbingan baru",
+      body: "Mahasiswa mengajukan bimbingan",
+      data,
+    });
+    await sendFcmToUsers([userId], {
+      title: "Permintaan bimbingan dikirim",
+      body: "Pengajuan bimbingan berhasil",
+      data: { ...data, role: "student" },
     });
   } catch (e) {
-    console.warn("WS notify failed (guidance request):", e?.message || e);
+    console.warn("FCM notify failed (guidance request):", e?.message || e);
   }
 
   // If a thesis file was uploaded, persist it and attach as a Document linked to the thesis
@@ -341,28 +340,21 @@ export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate
   } catch (e) {
     console.warn("Notify (DB) failed (reschedule):", e?.message || e);
   }
-  // WS notify all supervisors + student
+  // FCM notify all supervisors + student
   try {
     const supervisors = await getSupervisorsForThesis(guidance.thesisId);
-    const payload = {
-      guidanceId: guidance.id,
-      thesisId: guidance.thesisId,
-      scheduledAt: guidanceDate,
+    const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const data = {
+      type: "thesis-guidance:rescheduled",
+      role: "supervisor",
+      guidanceId: String(guidance.id),
+      thesisId: String(guidance.thesisId),
+      scheduledAt: new Date(guidanceDate).toISOString(),
     };
-    for (const p of supervisors) {
-      const supervisorUserId = p?.lecturer?.user?.id;
-      if (!supervisorUserId) continue;
-      wsSendToUser(supervisorUserId, "thesis-guidance:rescheduled", {
-        role: "supervisor",
-        ...payload,
-      });
-    }
-    wsSendToUser(userId, "thesis-guidance:rescheduled", {
-      role: "student",
-      ...payload,
-    });
+    await sendFcmToUsers(supUserIds, { title: "Jadwal bimbingan diubah", body: "Jadwal baru tersedia", data });
+    await sendFcmToUsers([userId], { title: "Bimbingan dijadwalkan ulang", body: "Jadwal baru tersedia", data: { ...data, role: "student" } });
   } catch (e) {
-    console.warn("WS notify failed (guidance reschedule):", e?.message || e);
+    console.warn("FCM notify failed (guidance reschedule):", e?.message || e);
   }
   const flat = {
     id: updated.id,
@@ -411,28 +403,21 @@ export async function cancelGuidanceService(userId, guidanceId, reason) {
   } catch (e) {
     console.warn("Notify (DB) failed (cancel):", e?.message || e);
   }
-  // WS notify all supervisors + student
+  // FCM notify all supervisors + student
   try {
     const supervisors = await getSupervisorsForThesis(guidance.thesisId);
-    const payload = {
-      guidanceId: guidance.id,
-      thesisId: guidance.thesisId,
-      reason: reason || "",
+    const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const data = {
+      type: "thesis-guidance:cancelled",
+      role: "supervisor",
+      guidanceId: String(guidance.id),
+      thesisId: String(guidance.thesisId),
+      reason: String(reason || ""),
     };
-    for (const p of supervisors) {
-      const supervisorUserId = p?.lecturer?.user?.id;
-      if (!supervisorUserId) continue;
-      wsSendToUser(supervisorUserId, "thesis-guidance:cancelled", {
-        role: "supervisor",
-        ...payload,
-      });
-    }
-    wsSendToUser(userId, "thesis-guidance:cancelled", {
-      role: "student",
-      ...payload,
-    });
+    await sendFcmToUsers(supUserIds, { title: "Bimbingan dibatalkan", body: reason || "", data });
+    await sendFcmToUsers([userId], { title: "Bimbingan dibatalkan", body: reason || "", data: { ...data, role: "student" } });
   } catch (e) {
-    console.warn("WS notify failed (guidance cancel):", e?.message || e);
+    console.warn("FCM notify failed (guidance cancel):", e?.message || e);
   }
   const flat = {
     id: updated.id,
@@ -477,28 +462,21 @@ export async function updateStudentNotesService(userId, guidanceId, studentNotes
   } catch (e) {
     console.warn("Notify (DB) failed (notes updated):", e?.message || e);
   }
-  // WS notify all supervisors + student
+  // FCM notify all supervisors + student
   try {
     const supervisors = await getSupervisorsForThesis(guidance.thesisId);
-    const payload = {
-      guidanceId: guidance.id,
-      thesisId: guidance.thesisId,
-      notes: studentNotes || "",
+    const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const data = {
+      type: "thesis-guidance:notes-updated",
+      role: "supervisor",
+      guidanceId: String(guidance.id),
+      thesisId: String(guidance.thesisId),
+      notes: String(studentNotes || ""),
     };
-    for (const p of supervisors) {
-      const supervisorUserId = p?.lecturer?.user?.id;
-      if (!supervisorUserId) continue;
-      wsSendToUser(supervisorUserId, "thesis-guidance:notes-updated", {
-        role: "supervisor",
-        ...payload,
-      });
-    }
-    wsSendToUser(userId, "thesis-guidance:notes-updated", {
-      role: "student",
-      ...payload,
-    });
+    await sendFcmToUsers(supUserIds, { title: "Catatan mahasiswa diperbarui", body: studentNotes || "", data });
+    await sendFcmToUsers([userId], { title: "Catatan diperbarui", body: studentNotes || "", data: { ...data, role: "student" } });
   } catch (e) {
-    console.warn("WS notify failed (notes updated):", e?.message || e);
+    console.warn("FCM notify failed (notes updated):", e?.message || e);
   }
   const flat = {
     id: updated.id,

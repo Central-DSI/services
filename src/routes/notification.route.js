@@ -6,6 +6,8 @@ import {
 	markNotificationRead,
 	markAllRead,
 	deleteNotification,
+	registerFcm,
+	unregisterFcm,
 } from "../controllers/notification.controller.js";
 
 const router = express.Router();
@@ -27,5 +29,9 @@ router.patch("/:id/read", markNotificationRead);
 
 // DELETE /notification/:id - Delete notification
 router.delete("/:id", deleteNotification);
+
+// FCM endpoints
+router.post("/fcm/register", registerFcm);
+router.delete("/fcm/unregister", unregisterFcm);
 
 export default router;

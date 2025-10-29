@@ -1,5 +1,4 @@
 import app from "./app.js";
-import { initWebSocket } from "./config/ws.js";
 import { ENV } from "./config/env.js";
 import { initConnections } from "./config/db.js";
 import { scheduleDailyThesisStatus } from "./queues/maintenance.queue.js";
@@ -15,8 +14,7 @@ async function startServer() {
     const server = app.listen(PORT, () => {
       console.log(`✅ Server running at http://localhost:${PORT}`);
     });
-    // Mount WebSocket on the same HTTP server
-    initWebSocket(server);
+    // WebSocket disabled: migrated to FCM push notifications
   } catch (err) {
     console.error("❌ Failed to start server:", err.message);
     process.exit(1); // hentikan proses biar gak lanjut tanpa koneksi
