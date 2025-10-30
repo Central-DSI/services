@@ -25,7 +25,7 @@ export async function getUserFcmTokens(userId) {
   return tokens || [];
 }
 
-export async function sendFcmToUsers(userIds = [], { title, body, data } = {}) {
+export async function sendFcmToUsers(userIds = [], { title, body, data, dataOnly } = {}) {
   const messaging = getFcmMessaging();
   if (!messaging) return { success: false, reason: "fcm-not-configured" };
   const uniqueTokens = new Set();
@@ -34,13 +34,26 @@ export async function sendFcmToUsers(userIds = [], { title, body, data } = {}) {
     tokens.forEach((t) => uniqueTokens.add(t));
   }
   const tokens = Array.from(uniqueTokens);
-  if (!tokens.length) return { success: true, sent: 0 };
-  const message = {
-    notification: title || body ? { title: title || undefined, body: body || undefined } : undefined,
-    data: Object.fromEntries(Object.entries(data || {}).map(([k, v]) => [k, String(v)])),
-    tokens,
-  };
+  if (!tokens.length) {
+    console.warn(`[FCM] No tokens for users: ${userIds.join(",")}`);
+    return { success: true, sent: 0 };
+  }
+  console.log(`[FCM] Preparing to send to ${tokens.length} token(s), users=${userIds.join(",")}, dataOnly=${Boolean(dataOnly)}`);
+  // For web, to ensure foreground onMessage fires, it's safer to send data-only payloads.
+  const payloadData = Object.fromEntries(
+    Object.entries({ ...(data || {}), ...(dataOnly ? { title, body } : {}) })
+      .filter(([_, v]) => v !== undefined && v !== null)
+      .map(([k, v]) => [k, String(v)])
+  );
+  const message = dataOnly
+    ? { data: payloadData, tokens }
+    : {
+        notification: title || body ? { title: title || undefined, body: body || undefined } : undefined,
+        data: payloadData,
+        tokens,
+      };
   const resp = await messaging.sendEachForMulticast(message);
+  console.log(`[FCM] Sent multicast: success=${resp.successCount}, failed=${resp.failureCount}`);
   // Remove invalid tokens
   const invalidTokens = [];
   resp.responses.forEach((r, idx) => {

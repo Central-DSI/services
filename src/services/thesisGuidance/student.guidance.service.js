@@ -215,10 +215,6 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
       title: "Permintaan bimbingan baru",
       message: `Mahasiswa mengajukan bimbingan. Jadwal: ${dateStr}`,
     });
-    await createNotificationsForUsers([userId], {
-      title: "Permintaan bimbingan dikirim",
-      message: `Pengajuan bimbingan berhasil. Jadwal: ${dateStr}`,
-    });
   } catch (e) {
     console.warn("Notify (DB) failed (guidance request):", e?.message || e);
   }
@@ -226,6 +222,7 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
   // Push realtime via FCM to all supervisors and the student
   try {
     const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    console.log(`[Guidance] Sending FCM requested -> supervisors=${supUserIds.join(',')} guidanceId=${created.id}`);
     const data = {
       type: "thesis-guidance:requested",
       role: "supervisor",
@@ -233,16 +230,13 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
       thesisId: String(thesis.id),
       scheduledAt: schedule?.guidanceDate ? new Date(schedule.guidanceDate).toISOString() : "",
       supervisorId: String(selectedSupervisorId),
+      playSound: "true",
     };
     await sendFcmToUsers(supUserIds, {
       title: "Permintaan bimbingan baru",
       body: "Mahasiswa mengajukan bimbingan",
       data,
-    });
-    await sendFcmToUsers([userId], {
-      title: "Permintaan bimbingan dikirim",
-      body: "Pengajuan bimbingan berhasil",
-      data: { ...data, role: "student" },
+      dataOnly: true,
     });
   } catch (e) {
     console.warn("FCM notify failed (guidance request):", e?.message || e);

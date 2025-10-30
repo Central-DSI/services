@@ -96,6 +96,8 @@ export async function registerFcm(req, res, next) {
 			e.statusCode = 400;
 			throw e;
 		}
+		const masked = token.length > 12 ? `${token.slice(0, 6)}...${token.slice(-6)}` : token;
+		console.log(`[FCM] register token user=${userId} token=${masked}`);
 		const result = await registerFcmToken(userId, token);
 		res.json({ success: true, ...result });
 	} catch (err) {
@@ -115,6 +117,8 @@ export async function unregisterFcm(req, res, next) {
 			e.statusCode = 400;
 			throw e;
 		}
+		const masked = token.length > 12 ? `${token.slice(0, 6)}...${token.slice(-6)}` : token;
+		console.log(`[FCM] unregister token user=${userId} token=${masked}`);
 		const result = await unregisterFcmToken(userId, token);
 		res.json({ success: true, ...result });
 	} catch (err) {
