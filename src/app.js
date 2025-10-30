@@ -13,19 +13,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
-// Add formatted `<key>Formatted` for any date-like fields in all JSON responses
-app.use(dateFormatMiddleware({ withSeconds: false }));
+// Include weekday (Indonesian) in all formatted date fields
+app.use(dateFormatMiddleware({ withSeconds: false, withDay: true }));
 
-// Resolve __filename/__dirname once
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Swagger UI (serve OpenAPI spec at /docs)
 try {
   const docsDir = path.join(__dirname, "docs");
-  // Serve the raw YAML and referenced fragments so the browser can resolve $ref URLs
   app.use("/docs", express.static(docsDir));
-  // Configure Swagger UI to fetch the YAML by URL, enabling client-side $ref resolution
   app.use(
     "/docs",
     swaggerUi.serve,
@@ -36,7 +32,6 @@ try {
   console.warn("⚠️ Swagger UI disabled — failed to initialize Swagger UI:", err.message);
 }
 
-// Serve uploaded files statically (e.g., thesis files)
 try {
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {
@@ -48,7 +43,6 @@ try {
   console.warn("⚠️ Failed to set up static uploads serving:", err.message);
 }
 
-// Auto register semua routes di /routes
 const routesPath = path.join(__dirname, "routes");
 
 try {
@@ -82,7 +76,6 @@ app.get("/", (req, res) => {
   res.json({ message: "API is running 🚀" });
 });
 
-// 404 logger → forward to error handler as JSON
 app.use((req, res, next) => {
   const msg = `Route not found: ${req.method} ${req.originalUrl}`;
   console.warn(`🛑 404 → ${msg}`);

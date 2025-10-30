@@ -48,37 +48,54 @@ export async function findMyStudents(lecturerId, roles) {
 }
 
 // List guidance requests assigned to this lecturer that are pending (scheduled without feedback)
-export async function findGuidanceRequests(lecturerId) {
-	return prisma.thesisGuidance.findMany({
-		where: {
-			supervisorId: lecturerId,
-			status: "scheduled",
-			// consider both null and empty string as "no feedback yet" (pending)
-			OR: [
-				{ supervisorFeedback: null },
-				{ supervisorFeedback: "" },
+export async function findGuidanceRequests(lecturerId, { page = 1, pageSize = 10 } = {}) {
+	const take = Math.max(1, Math.min(50, Number(pageSize) || 10));
+	const currentPage = Math.max(1, Number(page) || 1);
+	const skip = (currentPage - 1) * take;
+
+	const where = {
+		supervisorId: lecturerId,
+		status: "scheduled",
+		// consider both null and empty string as "no feedback yet" (pending)
+		OR: [{ supervisorFeedback: null }, { supervisorFeedback: "" }],
+	};
+
+	const [total, rows] = await prisma.$transaction([
+		prisma.thesisGuidance.count({ where }),
+		prisma.thesisGuidance.findMany({
+			where,
+			// newest-first by creation time; fallback by schedule date then id
+			orderBy: [
+				{ createdAt: "desc" },
+				{ schedule: { guidanceDate: "desc" } },
+				{ id: "desc" },
 			],
-		},
-		// newest-first by schedule date, fallback by id desc
-		orderBy: [
-			{ schedule: { guidanceDate: "desc" } },
-			{ id: "desc" },
-		],
-		include: {
-			thesis: {
-				include: {
-					student: { include: { user: true } },
+			include: {
+				thesis: {
+					include: {
+						student: { include: { user: true } },
+						document: true,
+					},
 				},
+				schedule: true,
+				supervisor: { include: { user: true } },
 			},
-			schedule: true,
-		},
-	});
+			skip,
+			take,
+		}),
+	]);
+
+	return { total, rows, page: currentPage, pageSize: take };
 }
 
 export async function findGuidanceByIdForLecturer(guidanceId, lecturerId) {
 	return prisma.thesisGuidance.findFirst({
 		where: { id: guidanceId, supervisorId: lecturerId },
-		include: { thesis: { include: { student: { include: { user: true } } } }, schedule: true },
+		include: {
+			thesis: { include: { student: { include: { user: true } }, document: true } },
+			schedule: true,
+			supervisor: { include: { user: true } },
+		},
 	});
 }
 

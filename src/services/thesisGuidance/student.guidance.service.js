@@ -16,9 +16,9 @@ import {
 } from "../../repositories/thesisGuidance/student.guidance.repository.js";
 
 import prisma from "../../config/prisma.js";
-// Replace WebSocket realtime with FCM push notifications
 import { sendFcmToUsers } from "../../services/push.service.js";
 import { createNotificationsForUsers } from "../notification.service.js";
+import { formatDateTimeJakarta } from "../../utils/date.util.js";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
@@ -27,13 +27,11 @@ const mkdir = promisify(fs.mkdir);
 
 async function ensureThesisAcademicYear(thesis) {
   if (thesis.academicYearId) return thesis;
-  // Try to attach current academic year based on date window, else latest by year
   const now = new Date();
   const current = await prisma.academicYear.findFirst({
     where: {
       OR: [
         { AND: [{ startDate: { lte: now } }, { endDate: { gte: now } }] },
-        // fallback: any with startDate <= now or endDate >= now
         { startDate: { lte: now } },
         { endDate: { gte: now } },
       ],
@@ -96,25 +94,23 @@ async function getActiveThesisOrThrow(userId) {
 export async function listMyGuidancesService(userId, status) {
   const { thesis } = await getActiveThesisOrThrow(userId);
   const rows = await listGuidancesForThesis(thesis.id, status);
-  // Defensive: ensure newest-first by schedule date on the service layer as well
   rows.sort((a, b) => {
     const at = a?.schedule?.guidanceDate ? new Date(a.schedule.guidanceDate).getTime() : 0;
     const bt = b?.schedule?.guidanceDate ? new Date(b.schedule.guidanceDate).getTime() : 0;
     if (bt !== at) return bt - at;
-    // tie-breaker by id desc
     return String(b.id).localeCompare(String(a.id));
   });
   const items = rows.map((g) => ({
     id: g.id,
     status: g.status,
     scheduledAt: g?.schedule?.guidanceDate || null,
+    scheduledAtFormatted: g?.schedule?.guidanceDate ? formatDateTimeJakarta(g.schedule.guidanceDate, { withDay: true }) : null,
     schedule: g?.schedule
-      ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate }
+      ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate, guidanceDateFormatted: formatDateTimeJakarta(g.schedule.guidanceDate, { withDay: true }) }
       : null,
     supervisorId: g.supervisorId || null,
     supervisorName: g?.supervisor?.user?.fullName || null,
   }));
-  // attach thesis document (same for all rows)
   let doc = null;
   try {
     const t = await prisma.thesis.findUnique({ where: { id: thesis.id }, include: { document: true } });
@@ -145,8 +141,9 @@ export async function getGuidanceDetailService(userId, guidanceId) {
     id: guidance.id,
     status: guidance.status,
     scheduledAt: guidance?.schedule?.guidanceDate || null,
+    scheduledAtFormatted: guidance?.schedule?.guidanceDate ? formatDateTimeJakarta(guidance.schedule.guidanceDate, { withDay: true }) : null,
     schedule: guidance?.schedule
-      ? { id: guidance.schedule.id, guidanceDate: guidance.schedule.guidanceDate }
+      ? { id: guidance.schedule.id, guidanceDate: guidance.schedule.guidanceDate, guidanceDateFormatted: formatDateTimeJakarta(guidance.schedule.guidanceDate, { withDay: true }) }
       : null,
     supervisorId: guidance.supervisorId || null,
     supervisorName: guidance?.supervisor?.user?.fullName || null,
@@ -170,10 +167,8 @@ export async function getGuidanceDetailService(userId, guidanceId) {
 
 export async function requestGuidanceService(userId, guidanceDate, studentNotes, file, meetingUrl, supervisorId) {
   let { thesis } = await getActiveThesisOrThrow(userId);
-  // make sure academic year is set when possible
   thesis = await ensureThesisAcademicYear(thesis);
   const supervisors = await getSupervisorsForThesis(thesis.id);
-  // prefer provided supervisor, else pembimbing1, then pembimbing2
   const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
   const sup1 = supervisors.find((p) => norm(p.role?.name) === "pembimbing1");
   const sup2 = supervisors.find((p) => norm(p.role?.name) === "pembimbing2");
@@ -207,10 +202,11 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
 
   await logThesisActivity(thesis.id, userId, "request-guidance", `Requested at ${guidanceDate.toISOString()}`);
 
-  // Persist notifications for all supervisors and the student
   try {
     const supervisorsUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
-    const dateStr = guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate);
+    const dateStr =
+      formatDateTimeJakarta(guidanceDate, { withDay: true }) ||
+      (guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate));
     await createNotificationsForUsers(supervisorsUserIds, {
       title: "Permintaan bimbingan baru",
       message: `Mahasiswa mengajukan bimbingan. Jadwal: ${dateStr}`,
@@ -219,7 +215,6 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
     console.warn("Notify (DB) failed (guidance request):", e?.message || e);
   }
 
-  // Push realtime via FCM to all supervisors and the student
   try {
     const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
     console.log(`[Guidance] Sending FCM requested -> supervisors=${supUserIds.join(',')} guidanceId=${created.id}`);
@@ -229,12 +224,15 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
       guidanceId: String(created.id),
       thesisId: String(thesis.id),
       scheduledAt: schedule?.guidanceDate ? new Date(schedule.guidanceDate).toISOString() : "",
+      scheduledAtFormatted: formatDateTimeJakarta(schedule?.guidanceDate, { withDay: true }) || "",
       supervisorId: String(selectedSupervisorId),
       playSound: "true",
     };
     await sendFcmToUsers(supUserIds, {
       title: "Permintaan bimbingan baru",
-      body: "Mahasiswa mengajukan bimbingan",
+      body: `Mahasiswa mengajukan bimbingan. Jadwal: ${
+        data.scheduledAtFormatted || formatDateTimeJakarta(guidanceDate, { withDay: true }) || "-"
+      }`,
       data,
       dataOnly: true,
     });
@@ -242,7 +240,6 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
     console.warn("FCM notify failed (guidance request):", e?.message || e);
   }
 
-  // If a thesis file was uploaded, persist it and attach as a Document linked to the thesis
   if (file && file.buffer) {
     try {
       const uploadsRoot = path.join(process.cwd(), "uploads", "thesis", thesis.id);
@@ -251,7 +248,6 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
       const filePath = path.join(uploadsRoot, safeName);
       await writeFile(filePath, file.buffer);
 
-      // store relative path in DB (web servers may serve /uploads)
       const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, "/");
 
       const docType = await getOrCreateDocumentType("Thesis");
@@ -264,25 +260,23 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
         },
       });
 
-      // attach document to thesis (do not change schema; update thesis.documentId)
       await prisma.thesis.update({ where: { id: thesis.id }, data: { documentId: doc.id } });
 
       await logThesisActivity(thesis.id, userId, "upload-thesis-document", `Uploaded ${file.originalname}`);
     } catch (err) {
-      // don't fail the whole request if file storage fails; log then continue
       console.error("Failed to store uploaded thesis file:", err.message || err);
     }
   }
 
-  // Return a flat guidance object consistent with other endpoints
   const supMap = new Map(supervisors.map((p) => [p.lecturerId, p]));
   const sup = supMap.get(selectedSupervisorId);
   const flat = {
     id: created.id,
     status: created.status,
     scheduledAt: schedule?.guidanceDate || null,
+    scheduledAtFormatted: schedule?.guidanceDate ? formatDateTimeJakarta(schedule.guidanceDate, { withDay: true }) : null,
     scheduleId: schedule?.id || null,
-    schedule: schedule ? { id: schedule.id, guidanceDate: schedule.guidanceDate } : null,
+    schedule: schedule ? { id: schedule.id, guidanceDate: schedule.guidanceDate, guidanceDateFormatted: formatDateTimeJakarta(schedule.guidanceDate, { withDay: true }) } : null,
     supervisorId: created.supervisorId || null,
     supervisorName: sup?.lecturer?.user?.fullName || null,
     meetingUrl: created.meetingUrl || null,
@@ -354,8 +348,9 @@ export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate
     id: updated.id,
     status: updated.status,
     scheduledAt: updated?.schedule?.guidanceDate || null,
+    scheduledAtFormatted: updated?.schedule?.guidanceDate ? formatDateTimeJakarta(updated.schedule.guidanceDate, { withDay: true }) : null,
     schedule: updated?.schedule
-      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate }
+      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate, guidanceDateFormatted: formatDateTimeJakarta(updated.schedule.guidanceDate, { withDay: true }) }
       : null,
     supervisorId: updated.supervisorId || null,
     supervisorName: null,
@@ -417,8 +412,9 @@ export async function cancelGuidanceService(userId, guidanceId, reason) {
     id: updated.id,
     status: updated.status,
     scheduledAt: updated?.schedule?.guidanceDate || null,
+    scheduledAtFormatted: updated?.schedule?.guidanceDate ? formatDateTimeJakarta(updated.schedule.guidanceDate, { withDay: true }) : null,
     schedule: updated?.schedule
-      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate }
+      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate, guidanceDateFormatted: formatDateTimeJakarta(updated.schedule.guidanceDate, { withDay: true }) }
       : null,
     supervisorId: updated.supervisorId || null,
     supervisorName: null,
@@ -517,8 +513,9 @@ export async function guidanceHistoryService(userId) {
     id: g.id,
     status: g.status,
     scheduledAt: g?.schedule?.guidanceDate || null,
+    scheduledAtFormatted: g?.schedule?.guidanceDate ? formatDateTimeJakarta(g.schedule.guidanceDate, { withDay: true }) : null,
     schedule: g?.schedule
-      ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate }
+      ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate, guidanceDateFormatted: formatDateTimeJakarta(g.schedule.guidanceDate, { withDay: true }) }
       : null,
     supervisorId: g.supervisorId || null,
     supervisorName: g?.supervisor?.user?.fullName || null,

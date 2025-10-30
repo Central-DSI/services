@@ -28,7 +28,9 @@ export async function myStudents(req, res, next) {
 
 export async function listRequests(req, res, next) {
 	try {
-		const result = await getRequestsService(req.user.sub);
+		const page = req.query?.page ? Number(req.query.page) : 1;
+		const pageSize = req.query?.pageSize ? Number(req.query.pageSize) : 10;
+		const result = await getRequestsService(req.user.sub, { page, pageSize });
 		res.json({ success: true, ...result });
 	} catch (err) {
 		next(err);

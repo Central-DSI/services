@@ -32,18 +32,24 @@ function ensureLecturer(lecturer) {
 function toFlatGuidance(g) {
   if (!g) return null;
   return {
-    id: g.id,
-    thesisId: g.thesisId || g.thesis?.id || null,
-    studentId: g.thesis?.studentId || g.thesis?.student?.id || null,
-    studentName: g.thesis?.student?.user?.fullName || null,
-    status: g.status,
-    scheduledAt: g?.schedule?.guidanceDate || null,
-    schedule: g?.schedule ? { id: g.schedule.id, guidanceDate: g.schedule.guidanceDate } : null,
-    supervisorId: g.supervisorId || null,
-    supervisorName: g?.supervisor?.user?.fullName || null,
-    meetingUrl: g.meetingUrl || null,
-    notes: g.studentNotes || null,
-    supervisorFeedback: g.supervisorFeedback || null,
+		id: g.id,
+		// Keep minimal identifiers; include studentId for UI fallbacks, omit thesisId/scheduleId to reduce noise
+		studentId: g.thesis?.studentId || g.thesis?.student?.id || null,
+		studentName: g.thesis?.student?.user?.fullName || null,
+		supervisorName: g?.supervisor?.user?.fullName || null,
+		status: g.status,
+		scheduledAt: g?.schedule?.guidanceDate || null,
+		schedule: g?.schedule ? { guidanceDate: g.schedule.guidanceDate } : null,
+		meetingUrl: g.meetingUrl || null,
+		notes: g.studentNotes || null,
+		supervisorFeedback: g.supervisorFeedback || null,
+		document: g?.thesis?.document
+			? { fileName: g.thesis.document.fileName, filePath: g.thesis.document.filePath }
+			: null,
+		createdAt: g.createdAt || null,
+    updatedAt: g.updatedAt || null,
+		// alias for UI compatibility
+		requestedAt: g.createdAt || null,
   };
 }
 
@@ -58,12 +64,13 @@ export async function getMyStudentsService(userId, roles) {
 	return { count: students.length, students };
 }
 
-export async function getRequestsService(userId) {
+export async function getRequestsService(userId, { page = 1, pageSize = 10 } = {}) {
 	const lecturer = await getLecturerByUserId(userId);
 	ensureLecturer(lecturer);
-	const requests = await findGuidanceRequests(lecturer.id);
-	const items = Array.isArray(requests) ? requests.map((g) => toFlatGuidance(g)) : [];
-	return { count: items.length, requests: items };
+	const { total, rows, page: p, pageSize: sz } = await findGuidanceRequests(lecturer.id, { page, pageSize });
+	const items = Array.isArray(rows) ? rows.map((g) => toFlatGuidance(g)) : [];
+	const totalPages = Math.max(1, Math.ceil(total / sz));
+	return { page: p, pageSize: sz, total, totalPages, requests: items };
 }
 
 export async function rejectGuidanceService(userId, guidanceId, { feedback } = {}) {

@@ -3,8 +3,8 @@
 const DEFAULT_TIME_ZONE = "Asia/Jakarta"; // WIB (UTC+7)
 const DEFAULT_LOCALE = "id-ID";
 
-// Format: YYYY-MM-DD HH:mm or with seconds
-export function formatDateTimeJakarta(input, { withSeconds = false } = {}) {
+// Format: [<weekday>, ]YYYY-MM-DD HH:mm or with seconds
+export function formatDateTimeJakarta(input, { withSeconds = false, withDay = false } = {}) {
 	if (!input) return null;
 	const d = input instanceof Date ? input : new Date(input);
 	if (isNaN(d)) return null;
@@ -20,6 +20,7 @@ export function formatDateTimeJakarta(input, { withSeconds = false } = {}) {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: withSeconds ? "2-digit" : undefined,
+		weekday: withDay ? "long" : undefined,
 		hour12: false,
 	});
 	const parts = Object.fromEntries(dtf.formatToParts(d).map((p) => [p.type, p.value]));
@@ -28,7 +29,17 @@ export function formatDateTimeJakarta(input, { withSeconds = false } = {}) {
 	const time = withSeconds
 		? `${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}`
 		: `${pad(parts.hour)}:${pad(parts.minute)}`;
-	return `${date} ${time}`.trim();
+	const day = parts.weekday ? `${parts.weekday}, ` : "";
+	return `${withDay ? day : ""}${date} ${time}`.trim();
+}
+
+// Helper: return weekday in Indonesian (e.g., "Senin", "Selasa") in Asia/Jakarta TZ
+export function getWeekdayIndonesian(input) {
+	if (!input) return null;
+	const d = input instanceof Date ? input : new Date(input);
+	if (isNaN(d)) return null;
+	const dtf = new Intl.DateTimeFormat(DEFAULT_LOCALE, { timeZone: DEFAULT_TIME_ZONE, weekday: "long" });
+	return dtf.format(d);
 }
 
 export function isValidDateValue(v) {
@@ -48,7 +59,7 @@ export function isProbablyDateKey(key) {
 }
 
 // Deep-clone and add `<key>Formatted` for date-like fields, preserving originals
-export function withFormattedDates(payload, { withSeconds = false } = {}) {
+export function withFormattedDates(payload, { withSeconds = false, withDay = false } = {}) {
 	if (payload == null) return payload;
 	if (Array.isArray(payload)) return payload.map((v) => withFormattedDates(v, { withSeconds }));
 	if (typeof payload !== "object") return payload;
@@ -64,7 +75,7 @@ export function withFormattedDates(payload, { withSeconds = false } = {}) {
 		}
 
 		if (isProbablyDateKey(key) && isValidDateValue(value)) {
-			const formatted = formatDateTimeJakarta(value, { withSeconds });
+			const formatted = formatDateTimeJakarta(value, { withSeconds, withDay });
 			if (formatted) {
 				out[`${key}Formatted`] = formatted;
 			}
@@ -75,6 +86,7 @@ export function withFormattedDates(payload, { withSeconds = false } = {}) {
 
 export default {
 	formatDateTimeJakarta,
+	getWeekdayIndonesian,
 	withFormattedDates,
 	isValidDateValue,
 	isProbablyDateKey,

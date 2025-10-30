@@ -85,6 +85,8 @@ model Student {
   researchMethodGrades ResearchMethodGrade[]
   internships       Internship[]
   yudisiumApplicants YudisiumApplicant[]
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
   
 
   @@map("students")
@@ -112,6 +114,8 @@ model Lecturer {
   thesisDefenceScores   ThesisDefenceScore[]
   internshipSupervisors InternshipSupervisor[]
   internshipGuidanceSchedules InternshipGuidanceSchedule[]
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("lecturers")
 }
@@ -120,6 +124,8 @@ model ScienceGroup {
   id        String   @id @default(uuid())
   name      String
   lecturers Lecturer[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("science_groups")
 }
@@ -135,6 +141,8 @@ model AcademicYear {
   thesisSeminarRubric ThesisSeminarRubric[]
   thesisDefenceRubrics ThesisDefenceRubric[]
   internships Internship[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("academic_years")
 }
@@ -146,6 +154,8 @@ model Room {
   thesisDefenceSchedules  ThesisDefenceSchedule[]
   yudisiumSchedules       YudisiumSchedule[]
   internshipSeminarBookings InternshipSeminarBooking[]
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("rooms")
 }
@@ -162,6 +172,8 @@ model Thesis {
   title             String?
   startDate         DateTime? @map("start_date")
   deadlineDate      DateTime? @map("deadline_date")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
   student           Student  @relation(fields: [studentId], references: [id])
   thesisTopic       ThesisTopic? @relation(fields: [thesisTopicId], references: [id])
   thesisProposal    ThesisProposal? @relation(fields: [thesisProposalId], references: [id])
@@ -186,6 +198,8 @@ model ThesisParticipant {
   thesis     Thesis   @relation(fields: [thesisId], references: [id])
   lecturer   Lecturer @relation(fields: [lecturerId], references: [id])
   role       UserRole @relation(fields: [roleId], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_participants")
 }
@@ -194,6 +208,8 @@ model ThesisTopic {
   id              String   @id @default(uuid())
   name            String
   thesis          Thesis[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_topics")
 }
@@ -215,6 +231,8 @@ model ThesisProposal {
   document   Document? @relation(fields: [documentId], references: [id])
   thesis     Thesis[]
   thesisProposalGrades ThesisProposalGrade[]
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_proposal")
 }
@@ -224,6 +242,8 @@ model ThesisProgressComponent {
   name        String
   description String?
   thesisProgressCompletions ThesisProgressCompletion[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_progress_components")
 }
@@ -236,6 +256,8 @@ model ThesisProgressCompletion {
   validatedBySupervisor     Boolean  @default(false) @map("validated_by_supervisor")
   thesis                    Thesis   @relation(fields: [thesisId], references: [id])
   component                 ThesisProgressComponent @relation(fields: [componentId], references: [id])
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_progress_completions")
 }
@@ -243,6 +265,8 @@ model ThesisProgressCompletion {
 model ThesisGuidanceSchedule {
   id          String   @id @default(uuid())
   guidanceDate DateTime? @map("guidance_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
   thesisGuidances ThesisGuidance[]
 
   @@map("thesis_guidance_schedules")
@@ -257,6 +281,8 @@ model ThesisGuidance {
   supervisorFeedback String? @map("supervisor_feedback")
   meetingUrl        String?  @map("meeting_url")
   status            GuidanceStatus @default(scheduled)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
   thesis            Thesis   @relation(fields: [thesisId], references: [id])
   schedule          ThesisGuidanceSchedule? @relation(fields: [scheduleId], references: [id])
   supervisor        Lecturer? @relation(fields: [supervisorId], references: [id])
@@ -289,6 +315,8 @@ model ThesisSeminar {
   result    ThesisSeminarResult? @relation(fields: [resultId], references: [id])
   audiences ThesisSeminarAudience[]
   scores    ThesisSeminarScore[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_seminars")
 }
@@ -302,6 +330,8 @@ model ThesisSeminarSchedule {
   room      Room?    @relation(fields: [roomId], references: [id])
   seminars  ThesisSeminar[]
   internshipSeminars InternshipSeminar[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_seminar_schedules")
 }
@@ -324,6 +354,8 @@ model ThesisSeminarAudience {
   seminar     ThesisSeminar @relation(fields: [seminarId], references: [id])
   user        User     @relation(fields: [userId], references: [id])
   validator   Lecturer? @relation(fields: [validatedBy], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_seminar_audiences")
 }
@@ -336,6 +368,8 @@ model ThesisSeminarRubric {
   academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
   creator         User?    @relation(fields: [createdBy], references: [id])
   details         ThesisSeminarRubricDetail[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_seminar_rubric")
 }
@@ -347,6 +381,8 @@ model ThesisSeminarRubricDetail {
   weight    Float?
   rubric    ThesisSeminarRubric @relation(fields: [rubricId], references: [id])
   scores    ThesisSeminarScore[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_seminar_rubric_details")
 }
@@ -361,6 +397,8 @@ model ThesisSeminarScore {
   seminar         ThesisSeminar @relation(fields: [seminarId], references: [id])
   rubricDetail    ThesisSeminarRubricDetail @relation(fields: [rubricDetailId], references: [id])
   scorer          Lecturer @relation(fields: [scoredBy], references: [id])
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_seminar_scores")
 }
@@ -375,6 +413,8 @@ model ThesisDefence {
   schedule                ThesisDefenceSchedule? @relation(fields: [thesisDefenceScheduleId], references: [id])
   status                  ThesisDefenceStatus? @relation(fields: [thesisDefenceStatusId], references: [id])
   scores                  ThesisDefenceScore[]
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_defences")
 }
@@ -388,6 +428,8 @@ model ThesisDefenceSchedule {
   supervisorApproval  Boolean? @map("supervisor_approval")
   room                Room?    @relation(fields: [roomId], references: [id])
   defences            ThesisDefence[]
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_defence_schedules")
 }
@@ -408,6 +450,8 @@ model ThesisDefenceRubric {
   academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
   creator         User?    @relation(fields: [createdBy], references: [id])
   details         ThesisDefenceRubricDetail[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_defence_rubrics")
 }
@@ -419,6 +463,8 @@ model ThesisDefenceRubricDetail {
   weight    Float?
   rubric    ThesisDefenceRubric @relation(fields: [rubricId], references: [id])
   scores    ThesisDefenceScore[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_defence_rubric_details")
 }
@@ -433,6 +479,8 @@ model ThesisDefenceScore {
   defence         ThesisDefence @relation(fields: [thesisDefenceId], references: [id])
   rubricDetail    ThesisDefenceRubricDetail @relation(fields: [rubricDetailId], references: [id])
   scorer          Lecturer @relation(fields: [scoredBy], references: [id])
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_defence_scores")
 }
@@ -444,6 +492,8 @@ model Yudisium {
   yudisiumDecree    String?  @map("yudisium_decree")
   schedule          YudisiumSchedule? @relation(fields: [yudisiumScheduleId], references: [id])
   participants      YudisiumParticipant[]
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("yudisiums")
 }
@@ -456,6 +506,8 @@ model YudisiumSchedule {
   departmentHeadApproval  Boolean? @map("department_head_approval")
   room                    Room?    @relation(fields: [roomId], references: [id])
   yudisiums               Yudisium[]
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("yudisium_schedules")
 }
@@ -468,6 +520,8 @@ model YudisiumApplicant {
   student                   Student  @relation(fields: [studentId], references: [id])
   status                    YudisiumApplicantStatus? @relation(fields: [yudisiumApplicantStatusId], references: [id])
   participants              YudisiumParticipant[]
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
 
   @@map("yudisium_applicants")
 }
@@ -486,6 +540,8 @@ model YudisiumParticipant {
   yudisiumApplicantId String   @map("yudisium_applicant_id")
   yudisium            Yudisium @relation(fields: [yudisiumId], references: [id])
   applicant           YudisiumApplicant @relation(fields: [yudisiumApplicantId], references: [id])
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("yudisium_participants")
 }
@@ -497,6 +553,8 @@ model Document {
   documentTypeId  String?  @map("document_type_id")
   filePath        String?  @map("file_path")
   fileName        String?  @map("file_name")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
   user            User?    @relation(fields: [userId], references: [id])
   documentType    DocumentType? @relation(fields: [documentTypeId], references: [id])
   canvasFiles     CanvasFile[]
@@ -514,6 +572,8 @@ model DocumentType {
   id        String   @id @default(uuid())
   name      String?
   documents Document[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("document_types")
 }
@@ -522,6 +582,8 @@ model DocumentTemplate {
   id        String   @id @default(uuid())
   name      String?
   filePath  String?  @map("file_path")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("document_templates")
 }
@@ -534,6 +596,8 @@ model CanvasFile {
   version     Int?
   document    Document? @relation(fields: [documentId], references: [id])
   user        User?    @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("canvas_files")
 }
@@ -557,6 +621,8 @@ model ThesisProposalGrade {
   proposalId String?  @map("proposal_id")
   grade     Int?
   proposal  ThesisProposal? @relation(fields: [proposalId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("thesis_proposal_grades")
 }
@@ -566,6 +632,8 @@ model ResearchMethodGrade {
   studentId String?  @map("student_id")
   grade     Int?
   student   Student? @relation(fields: [studentId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("research_method_grades")
 }
@@ -613,6 +681,8 @@ model InternshipSupervisor {
   internship              Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
   lecturer                Lecturer? @relation(fields: [lecturerId], references: [id])
   role                    UserRole  @relation(fields: [roleId], references: [id])
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("internship_supervisors")
 }
@@ -657,6 +727,8 @@ model InternshipSeminar {
   internship  Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
   schedule    ThesisSeminarSchedule? @relation(fields: [scheduleId], references: [id])
   result      ThesisSeminarResult? @relation(fields: [resultId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("internship_seminars")
 }
@@ -672,6 +744,8 @@ model InternshipApproval {
   internship  Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
   approver    User?    @relation(fields: [approvedBy], references: [id])
   role        UserRole? @relation(fields: [roleId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("internship_approvals")
 }
