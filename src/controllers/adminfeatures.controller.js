@@ -79,7 +79,10 @@ export async function getUsersController(req, res, next) {
 		const page = parseInt(req.query.page) || 1;
 		const pageSize = parseInt(req.query.pageSize) || 10;
 		const search = req.query.search || "";
-		const result = await getUsers({ page, pageSize, search });
+		const identityType = req.query.identityType || "";
+		const role = req.query.role || "";
+		const isVerified = req.query.isVerified !== undefined ? req.query.isVerified === 'true' : undefined;
+		const result = await getUsers({ page, pageSize, search, identityType, role, isVerified });
 		res.status(200).json({ success: true, ...result });
 	} catch (err) {
 		next(err);

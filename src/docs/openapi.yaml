@@ -21,6 +21,8 @@ tags:
     description: Authentication endpoints (JWT access + refresh)
   - name: AdminFeatures
     description: Admin-only utilities and maintenance endpoints
+  - name: Notification
+    description: Notification management and FCM token endpoints
   - name: LecturerThesisGuidance
     description: Lecturer-side thesis guidance endpoints
   - name: StudentThesisGuidance
@@ -64,6 +66,9 @@ paths:
   "/auth/password":
     $ref: "./auth/swagger-auth.yaml#/auth_password"
 
+  "/auth/profile":
+    $ref: "./auth/swagger-auth.yaml#/auth_profile"
+
   "/auth/reset/request":
     $ref: "./auth/swagger-auth.yaml#/auth_reset_request"
 
@@ -73,22 +78,59 @@ paths:
   "/auth/reset/confirm":
     $ref: "./auth/swagger-auth.yaml#/auth_reset_confirm"
 
+  "/auth/verify":
+    $ref: "./auth/swagger-auth.yaml#/auth_verify"
+
+  "/auth/verify/request":
+    $ref: "./auth/swagger-auth.yaml#/auth_verify_request"
+
   "/adminfeatures/students/import":
     $ref: "./admin/swagger-admin.yaml#/admin_import_students"
 
   "/adminfeatures/users":
-    $ref: "./admin/swagger-admin.yaml#/admin_create_user"
+    get:
+      $ref: "./admin/swagger-admin.yaml#/admin_get_users"
+    post:
+      $ref: "./admin/swagger-admin.yaml#/admin_create_user"
+
+  "/adminfeatures/students":
+    $ref: "./admin/swagger-admin.yaml#/admin_get_students"
+
+  "/adminfeatures/lecturers":
+    $ref: "./admin/swagger-admin.yaml#/admin_get_lecturers"
 
   "/adminfeatures/{id}":
     $ref: "./admin/swagger-admin.yaml#/admin_update_user"
 
   "/adminfeatures/academic-years":
-    $ref: "./admin/swagger-admin.yaml#/admin_create_academic_year"
+    get:
+      $ref: "./admin/swagger-admin.yaml#/admin_get_academic_years"
+    post:
+      $ref: "./admin/swagger-admin.yaml#/admin_create_academic_year"
+  
   "/adminfeatures/academic-years/{id}":
     $ref: "./admin/swagger-admin.yaml#/admin_update_academic_year"
 
-  "/auth/verify/request":
-    $ref: "./auth/swagger-auth.yaml#/auth_verify_request"
+  "/notification":
+    $ref: "./notification/swagger-notification.yaml#/notification_get_all"
+
+  "/notification/unread-count":
+    $ref: "./notification/swagger-notification.yaml#/notification_unread_count"
+
+  "/notification/read-all":
+    $ref: "./notification/swagger-notification.yaml#/notification_mark_all_read"
+
+  "/notification/{id}/read":
+    $ref: "./notification/swagger-notification.yaml#/notification_mark_read"
+
+  "/notification/{id}":
+    $ref: "./notification/swagger-notification.yaml#/notification_delete"
+
+  "/notification/fcm/register":
+    $ref: "./notification/swagger-notification.yaml#/notification_fcm_register"
+
+  "/notification/fcm/unregister":
+    $ref: "./notification/swagger-notification.yaml#/notification_fcm_unregister"
 
   "/thesisGuidance/lecturer/my-students":
     $ref: "./thesisGuidance/lecturer.yaml#/lecturer_my_students"

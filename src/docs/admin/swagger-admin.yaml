@@ -221,3 +221,203 @@ admin_update_academic_year:
             schema: { $ref: "../openapi.yaml#/components/schemas/ErrorResponse" }
       "409": { $ref: "../openapi.yaml#/components/responses/Conflict" }
       "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_get_users:
+  get:
+    tags: [AdminFeatures]
+    summary: Admin - Get all users with pagination
+    operationId: adminGetUsers
+    security:
+      - bearerAuth: []
+    parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number
+      - in: query
+        name: pageSize
+        schema:
+          type: integer
+          default: 10
+        description: Number of items per page
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by name, email, or identity number
+    responses:
+      "200":
+        description: List of users
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                users:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                pagination:
+                  type: object
+                  properties:
+                    page: { type: integer }
+                    pageSize: { type: integer }
+                    total: { type: integer }
+                    totalPages: { type: integer }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_get_students:
+  get:
+    tags: [AdminFeatures]
+    summary: Admin - Get all students with pagination
+    operationId: adminGetStudents
+    security:
+      - bearerAuth: []
+    parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number
+      - in: query
+        name: pageSize
+        schema:
+          type: integer
+          default: 10
+        description: Number of items per page
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by name, email, or NIM
+    responses:
+      "200":
+        description: List of students
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                students:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                pagination:
+                  type: object
+                  properties:
+                    page: { type: integer }
+                    pageSize: { type: integer }
+                    total: { type: integer }
+                    totalPages: { type: integer }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_get_lecturers:
+  get:
+    tags: [AdminFeatures]
+    summary: Admin - Get all lecturers with pagination
+    operationId: adminGetLecturers
+    security:
+      - bearerAuth: []
+    parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number
+      - in: query
+        name: pageSize
+        schema:
+          type: integer
+          default: 10
+        description: Number of items per page
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by name, email, or NIP
+    responses:
+      "200":
+        description: List of lecturers
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                lecturers:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                pagination:
+                  type: object
+                  properties:
+                    page: { type: integer }
+                    pageSize: { type: integer }
+                    total: { type: integer }
+                    totalPages: { type: integer }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }
+
+admin_get_academic_years:
+  get:
+    tags: [AdminFeatures]
+    summary: Admin - Get all academic years with pagination
+    operationId: adminGetAcademicYears
+    security:
+      - bearerAuth: []
+    parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+        description: Page number
+      - in: query
+        name: pageSize
+        schema:
+          type: integer
+          default: 10
+        description: Number of items per page
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search by year or semester
+    responses:
+      "200":
+        description: List of academic years
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean, example: true }
+                academicYears:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                pagination:
+                  type: object
+                  properties:
+                    page: { type: integer }
+                    pageSize: { type: integer }
+                    total: { type: integer }
+                    totalPages: { type: integer }
+      "401": { $ref: "../openapi.yaml#/components/responses/Unauthorized" }
+      "403": { $ref: "../openapi.yaml#/components/responses/Forbidden" }
+      "500": { $ref: "../openapi.yaml#/components/responses/InternalError" }

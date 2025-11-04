@@ -533,19 +533,37 @@ export async function getAcademicYears({ page = 1, pageSize = 10, search = "" } 
 }
 
 // Get all Users with pagination
-export async function getUsers({ page = 1, pageSize = 10, search = "" } = {}) {
+export async function getUsers({ page = 1, pageSize = 10, search = "", identityType = "", role = "", isVerified = undefined } = {}) {
 	const skip = (page - 1) * pageSize;
 	const take = pageSize;
 
-	const where = search
-		? {
+	// Build where clause with all filters
+	const where = {
+		AND: [
+			// Search filter
+			search ? {
 				OR: [
 					{ fullName: { contains: search, mode: "insensitive" } },
 					{ email: { contains: search, mode: "insensitive" } },
 					{ identityNumber: { contains: search, mode: "insensitive" } },
 				],
-		  }
-		: {};
+			} : {},
+			// Identity type filter
+			identityType ? { identityType } : {},
+			// Verified status filter
+			isVerified !== undefined ? { isVerified } : {},
+			// Role filter
+			role ? {
+				userHasRoles: {
+					some: {
+						role: {
+							name: role
+						}
+					}
+				}
+			} : {},
+		].filter(condition => Object.keys(condition).length > 0) // Remove empty conditions
+	};
 
 	const [users, total] = await Promise.all([
 		prisma.user.findMany({

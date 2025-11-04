@@ -242,6 +242,72 @@ auth_reset_confirm:
       "500":
         $ref: "../openapi.yaml#/components/responses/InternalError"
 
+auth_profile:
+  patch:
+    tags: [Auth]
+    summary: Update user profile
+    operationId: authUpdateProfile
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              phoneNumber:
+                type: string
+                nullable: true
+          example:
+            phoneNumber: "+628123456789"
+    responses:
+      "200":
+        description: Profile updated
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                user:
+                  type: object
+                  description: Updated user with relations
+                  additionalProperties: true
+      "400":
+        $ref: "../openapi.yaml#/components/responses/BadRequest"
+      "401":
+        $ref: "../openapi.yaml#/components/responses/Unauthorized"
+      "500":
+        $ref: "../openapi.yaml#/components/responses/InternalError"
+
+auth_verify:
+  get:
+    tags: [Auth]
+    summary: Verify account with token (email link)
+    operationId: authVerifyAccount
+    parameters:
+      - in: query
+        name: token
+        schema:
+          type: string
+        required: true
+        description: Verification token from email
+    responses:
+      "302":
+        description: Redirects to frontend with verification result
+        headers:
+          Location:
+            schema:
+              type: string
+            description: Redirect URL with query params (verified=success/error&message=...)
+      "400":
+        $ref: "../openapi.yaml#/components/responses/BadRequest"
+      "500":
+        $ref: "../openapi.yaml#/components/responses/InternalError"
+
 auth_verify_request:
   post:
     tags: [Auth]
