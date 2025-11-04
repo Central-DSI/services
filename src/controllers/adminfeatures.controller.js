@@ -1,4 +1,4 @@
-import { importStudentsCsvFromUpload, adminUpdateUser, createAcademicYear, updateAcademicYear, adminCreateUser } from "../services/adminfeatures.service.js";
+import { importStudentsCsvFromUpload, adminUpdateUser, createAcademicYear, updateAcademicYear, adminCreateUser, getAcademicYears, getUsers, getStudents, getLecturers } from "../services/adminfeatures.service.js";
 
 export async function importStudentsCsv(req, res, next) {
 	try {
@@ -57,6 +57,54 @@ export async function updateAcademicYearController(req, res, next) {
 		const { semester, year, startDate, endDate } = body;
 		const updated = await updateAcademicYear(id, { semester, year, startDate, endDate });
 		res.status(200).json({ success: true, academicYear: updated });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function getAcademicYearsController(req, res, next) {
+	try {
+		const page = parseInt(req.query.page) || 1;
+		const pageSize = parseInt(req.query.pageSize) || 10;
+		const search = req.query.search || "";
+		const result = await getAcademicYears({ page, pageSize, search });
+		res.status(200).json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function getUsersController(req, res, next) {
+	try {
+		const page = parseInt(req.query.page) || 1;
+		const pageSize = parseInt(req.query.pageSize) || 10;
+		const search = req.query.search || "";
+		const result = await getUsers({ page, pageSize, search });
+		res.status(200).json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function getStudentsController(req, res, next) {
+	try {
+		const page = parseInt(req.query.page) || 1;
+		const pageSize = parseInt(req.query.pageSize) || 10;
+		const search = req.query.search || "";
+		const result = await getStudents({ page, pageSize, search });
+		res.status(200).json({ success: true, ...result });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function getLecturersController(req, res, next) {
+	try {
+		const page = parseInt(req.query.page) || 1;
+		const pageSize = parseInt(req.query.pageSize) || 10;
+		const search = req.query.search || "";
+		const result = await getLecturers({ page, pageSize, search });
+		res.status(200).json({ success: true, ...result });
 	} catch (err) {
 		next(err);
 	}

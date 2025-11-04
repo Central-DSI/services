@@ -1,5 +1,6 @@
 import { loginWithEmailPassword, refreshTokens, logout, verifyAccessToken, changePassword, requestPasswordReset, verifyPasswordResetToken, resetPasswordWithToken, verifyAccountToken, requestAccountVerification, getUserProfile } from "../services/auth.service.js";
 import { ENV } from "../config/env.js";
+import prisma from "../config/prisma.js";
 
 export async function login(req, res, next) {
 	try {
@@ -45,6 +46,74 @@ export async function doLogout(req, res, next) {
 	try {
 		await logout(req.user.sub);
 		res.json({ success: true });
+	} catch (err) {
+		next(err);
+	}
+}
+
+export async function updateProfileHandler(req, res, next) {
+	try {
+		const { phoneNumber } = req.body || {};
+		const userId = req.user.sub;
+
+		// Update user
+		const updatedUser = await prisma.user.update({
+			where: { id: userId },
+			data: {
+				phoneNumber: phoneNumber || null,
+			},
+			include: {
+				userHasRoles: {
+					include: {
+						role: true,
+					},
+				},
+				student: {
+					include: {
+						studentStatus: true,
+					},
+				},
+				lecturer: {
+					include: {
+						scienceGroup: true,
+					},
+				},
+			},
+		});
+
+		// Format response seperti getUserProfile
+		const response = {
+			id: updatedUser.id,
+			fullName: updatedUser.fullName,
+			email: updatedUser.email,
+			identityNumber: updatedUser.identityNumber,
+			identityType: updatedUser.identityType,
+			phoneNumber: updatedUser.phoneNumber,
+			isVerified: updatedUser.isVerified,
+			roles: updatedUser.userHasRoles.map((uhr) => ({
+				id: uhr.role.id,
+				name: uhr.role.name,
+				status: uhr.status,
+			})),
+		};
+
+		if (updatedUser.student) {
+			response.student = {
+				id: updatedUser.student.id,
+				enrollmentYear: updatedUser.student.enrollmentYear,
+				sksCompleted: updatedUser.student.skscompleted,
+				status: updatedUser.student.studentStatus?.name || null,
+			};
+		}
+
+		if (updatedUser.lecturer) {
+			response.lecturer = {
+				id: updatedUser.lecturer.id,
+				scienceGroup: updatedUser.lecturer.scienceGroup?.name || null,
+			};
+		}
+
+		res.json({ success: true, data: response });
 	} catch (err) {
 		next(err);
 	}

@@ -224,27 +224,73 @@ export async function verifyAccountToken(token) {
 // Get Current User Profile (with roles)
 // -----------------------------
 export async function getUserProfile(userId) {
-	const user = await findUserById(userId);
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		include: {
+			userHasRoles: {
+				include: {
+					role: true,
+				},
+			},
+			student: {
+				include: {
+					studentStatus: true,
+				},
+			},
+			lecturer: {
+				include: {
+					scienceGroup: true,
+				},
+			},
+		},
+	});
+
 	if (!user) {
 		const err = new Error("User not found");
 		err.statusCode = 404;
 		throw err;
 	}
 
-	// Fetch roles for the user (from user_has_roles -> user_roles)
-	const roleAssignments = await getUserRolesWithIds(userId);
-	const roles = (roleAssignments || []).map((ra) => ({
-		id: ra?.role?.id,
-		name: ra?.role?.name,
-		status: ra?.status,
+	// Map roles
+	const roles = user.userHasRoles.map((ur) => ({
+		id: ur.role.id,
+		name: ur.role.name,
+		status: ur.status,
 	}));
 
-	return {
+	// Build response
+	const profile = {
 		id: user.id,
 		fullName: user.fullName,
 		email: user.email,
+		identityNumber: user.identityNumber,
+		identityType: user.identityType,
+		phoneNumber: user.phoneNumber,
+		isVerified: user.isVerified,
 		roles,
+		createdAt: user.createdAt,
+		updatedAt: user.updatedAt,
 	};
+
+	// Add student info if exists
+	if (user.student) {
+		profile.student = {
+			id: user.student.id,
+			enrollmentYear: user.student.enrollmentYear,
+			sksCompleted: user.student.skscompleted,
+			status: user.student.studentStatus?.name || null,
+		};
+	}
+
+	// Add lecturer info if exists
+	if (user.lecturer) {
+		profile.lecturer = {
+			id: user.lecturer.id,
+			scienceGroup: user.lecturer.scienceGroup?.name || null,
+		};
+	}
+
+	return profile;
 }
 
 // -----------------------------

@@ -57,6 +57,35 @@ export async function adminUpdateUser(id, payload = {}) {
 
 	const { fullName, email, roles, identityNumber, identityType, isVerified } = payload || {};
 
+	// Validate: if identityType is NIM (current or new), role must be student only
+	const currentIdentityType = String(user.identityType || "").toUpperCase();
+	const newIdentityType = String(identityType || currentIdentityType || "").toUpperCase();
+	
+	if (newIdentityType === "NIM" && Array.isArray(roles)) {
+		const hasNonStudentRole = roles.some((r) => {
+			const roleName = typeof r === "string" ? r : r?.name;
+			return String(roleName || "").trim().toLowerCase() !== "student";
+		});
+		if (hasNonStudentRole) {
+			const err = new Error("User dengan identity type NIM hanya dapat memiliki role student (mahasiswa)");
+			err.statusCode = 400;
+			throw err;
+		}
+	}
+
+	// Validate: if identityType is NIP (current or new), cannot have student role
+	if (newIdentityType === "NIP" && Array.isArray(roles)) {
+		const hasStudentRole = roles.some((r) => {
+			const roleName = typeof r === "string" ? r : r?.name;
+			return String(roleName || "").trim().toLowerCase() === "student";
+		});
+		if (hasStudentRole) {
+			const err = new Error("User dengan identity type NIP tidak dapat memiliki role student (mahasiswa)");
+			err.statusCode = 400;
+			throw err;
+		}
+	}
+
 	// Prepare update data
 	const updateData = {};
 	if (typeof fullName === "string" && fullName.trim()) updateData.fullName = fullName.trim();
@@ -149,6 +178,26 @@ export async function adminCreateUser({ fullName, email, roles = [], identityNum
 		const err = new Error("Email is required");
 		err.statusCode = 400;
 		throw err;
+	}
+
+	// Validate: if identityType is NIM, role must be student only
+	if (String(identityType || "").toUpperCase() === "NIM") {
+		const hasNonStudentRole = roles.some((r) => String(r).trim().toLowerCase() !== "student");
+		if (hasNonStudentRole || roles.length === 0) {
+			const err = new Error("User dengan identity type NIM hanya dapat memiliki role student (mahasiswa)");
+			err.statusCode = 400;
+			throw err;
+		}
+	}
+
+	// Validate: if identityType is NIP, cannot have student role
+	if (String(identityType || "").toUpperCase() === "NIP") {
+		const hasStudentRole = roles.some((r) => String(r).trim().toLowerCase() === "student");
+		if (hasStudentRole) {
+			const err = new Error("User dengan identity type NIP tidak dapat memiliki role student (mahasiswa)");
+			err.statusCode = 400;
+			throw err;
+		}
 	}
 
 	const existing = await findUserByEmailOrIdentity(String(email).toLowerCase(), identityNumber);
@@ -447,5 +496,291 @@ export async function updateAcademicYear(id, { semester, year, startDate, endDat
 	const updated = await prisma.academicYear.update({ where: { id }, data });
 	return updated;
 }
+
+// Get all Academic Years with pagination
+export async function getAcademicYears({ page = 1, pageSize = 10, search = "" } = {}) {
+	const skip = (page - 1) * pageSize;
+	const take = pageSize;
+
+	const where = search
+		? {
+				OR: [
+					{ year: !isNaN(parseInt(search)) ? parseInt(search) : undefined },
+					{ semester: { contains: search, mode: "insensitive" } },
+				].filter((condition) => condition.year !== undefined || condition.semester !== undefined),
+		  }
+		: {};
+
+	const [academicYears, total] = await Promise.all([
+		prisma.academicYear.findMany({
+			where,
+			skip,
+			take,
+			orderBy: [{ year: "desc" }, { semester: "desc" }, { createdAt: "desc" }],
+		}),
+		prisma.academicYear.count({ where }),
+	]);
+
+	return {
+		academicYears,
+		meta: {
+			page,
+			pageSize,
+			total,
+			totalPages: Math.ceil(total / pageSize),
+		},
+	};
+}
+
+// Get all Users with pagination
+export async function getUsers({ page = 1, pageSize = 10, search = "" } = {}) {
+	const skip = (page - 1) * pageSize;
+	const take = pageSize;
+
+	const where = search
+		? {
+				OR: [
+					{ fullName: { contains: search, mode: "insensitive" } },
+					{ email: { contains: search, mode: "insensitive" } },
+					{ identityNumber: { contains: search, mode: "insensitive" } },
+				],
+		  }
+		: {};
+
+	const [users, total] = await Promise.all([
+		prisma.user.findMany({
+			where,
+			skip,
+			take,
+			orderBy: { createdAt: "desc" },
+			include: {
+				userHasRoles: {
+					include: {
+						role: true,
+					},
+				},
+			},
+		}),
+		prisma.user.count({ where }),
+	]);
+
+	// Transform userHasRoles to roles format
+	const transformedUsers = users.map((user) => ({
+		...user,
+		roles: user.userHasRoles.map((ur) => ({
+			id: ur.role.id,
+			name: ur.role.name,
+			status: ur.status,
+		})),
+		userHasRoles: undefined, // Remove userHasRoles from response
+	}));
+
+	return {
+		users: transformedUsers,
+		meta: {
+			page,
+			pageSize,
+			total,
+			totalPages: Math.ceil(total / pageSize),
+		},
+	};
+}
+
+// Get all Students with detailed information
+export async function getStudents({ page = 1, pageSize = 10, search = "" } = {}) {
+	const skip = (page - 1) * pageSize;
+	const take = pageSize;
+
+	const where = {
+		student: { isNot: null }, // Only users with student record
+		...(search
+			? {
+					OR: [
+						{ fullName: { contains: search, mode: "insensitive" } },
+						{ email: { contains: search, mode: "insensitive" } },
+						{ identityNumber: { contains: search, mode: "insensitive" } },
+					],
+			  }
+			: {}),
+	};
+
+	const [students, total] = await Promise.all([
+		prisma.user.findMany({
+			where,
+			skip,
+			take,
+			orderBy: { createdAt: "desc" },
+			include: {
+				student: {
+					include: {
+						studentStatus: true,
+						thesis: {
+							where: {
+								thesisStatus: {
+									name: {
+										notIn: ["Selesai", "Dibatalkan"],
+									},
+								},
+							},
+							include: {
+								thesisParticipants: {
+									include: {
+										lecturer: {
+											include: {
+												user: {
+													select: {
+														fullName: true,
+													},
+												},
+											},
+										},
+										role: true,
+									},
+								},
+							},
+						},
+					},
+				},
+				userHasRoles: {
+					include: {
+						role: true,
+					},
+				},
+			},
+		}),
+		prisma.user.count({ where }),
+	]);
+
+	// Transform data
+	const transformedStudents = students.map((user) => ({
+		id: user.id,
+		fullName: user.fullName,
+		email: user.email,
+		identityNumber: user.identityNumber,
+		identityType: user.identityType,
+		isVerified: user.isVerified,
+		createdAt: user.createdAt,
+		student: user.student
+			? {
+					id: user.student.id,
+					enrollmentYear: user.student.enrollmentYear,
+					sksCompleted: user.student.skscompleted,
+					status: user.student.studentStatus?.name || null,
+					activeTheses: user.student.thesis.map((thesis) => ({
+						title: thesis.title,
+						supervisors: thesis.thesisParticipants
+							.filter((tp) => tp.role.name === "pembimbing1" || tp.role.name === "pembimbing2")
+							.map((tp) => ({
+								role: tp.role.name === "pembimbing1" ? "Pembimbing 1" : "Pembimbing 2",
+								fullName: tp.lecturer.user.fullName,
+							})),
+					})),
+			  }
+			: null,
+		roles: user.userHasRoles.map((ur) => ({
+			id: ur.role.id,
+			name: ur.role.name,
+			status: ur.status,
+		})),
+	}));
+
+	return {
+		students: transformedStudents,
+		meta: {
+			page,
+			pageSize,
+			total,
+			totalPages: Math.ceil(total / pageSize),
+		},
+	};
+}
+
+// Get all Lecturers with detailed information
+export async function getLecturers({ page = 1, pageSize = 10, search = "" } = {}) {
+	const skip = (page - 1) * pageSize;
+	const take = pageSize;
+
+	const where = {
+		lecturer: { isNot: null }, // Only users with lecturer record
+		...(search
+			? {
+					OR: [
+						{ fullName: { contains: search, mode: "insensitive" } },
+						{ email: { contains: search, mode: "insensitive" } },
+						{ identityNumber: { contains: search, mode: "insensitive" } },
+					],
+			  }
+			: {}),
+	};
+
+	const [lecturers, total] = await Promise.all([
+		prisma.user.findMany({
+			where,
+			skip,
+			take,
+			orderBy: { createdAt: "desc" },
+			include: {
+				lecturer: {
+					include: {
+						_count: {
+							select: {
+								thesisGuidances: {
+									where: { 
+										status: "completed",
+									},
+								},
+								thesisSeminarScores: true,
+								thesisDefenceScores: true,
+							},
+						},
+					},
+				},
+				userHasRoles: {
+					include: {
+						role: true,
+					},
+				},
+			},
+		}),
+		prisma.user.count({ where }),
+	]);
+
+	// Transform data
+	const transformedLecturers = lecturers.map((user) => ({
+		id: user.id,
+		fullName: user.fullName,
+		email: user.email,
+		identityNumber: user.identityNumber,
+		identityType: user.identityType,
+		phone: user.phoneNumber,
+		isVerified: user.isVerified,
+		createdAt: user.createdAt,
+		lecturer: user.lecturer
+			? {
+					id: user.lecturer.id,
+					activeGuidances: user.lecturer._count?.thesisGuidances || 0,
+					seminarJuries: user.lecturer._count?.thesisSeminarScores || 0,
+					defenceJuries: user.lecturer._count?.thesisDefenceScores || 0,
+			  }
+			: null,
+		roles: user.userHasRoles.map((ur) => ({
+			id: ur.role.id,
+			name: ur.role.name,
+			status: ur.status,
+		})),
+	}));
+
+	return {
+		lecturers: transformedLecturers,
+		meta: {
+			page,
+			pageSize,
+			total,
+			totalPages: Math.ceil(total / pageSize),
+		},
+	};
+}
+
+
 
 
