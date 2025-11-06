@@ -280,7 +280,7 @@ model ThesisGuidance {
   studentNotes      String?  @map("student_notes")
   supervisorFeedback String? @map("supervisor_feedback")
   meetingUrl        String?  @map("meeting_url")
-  status            GuidanceStatus @default(scheduled)
+  status            GuidanceStatus @default(requested)
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   thesis            Thesis   @relation(fields: [thesisId], references: [id])
@@ -808,9 +808,9 @@ enum ProposalStatus {
 }
 
 enum GuidanceStatus {
-  scheduled
-  completed
-  cancelled
+  requested
+  accepted
+  rejected
 }
 
 enum SeminarStatus {

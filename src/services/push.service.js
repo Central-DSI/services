@@ -59,6 +59,8 @@ export async function sendFcmToUsers(userIds = [], { title, body, data, dataOnly
   resp.responses.forEach((r, idx) => {
     if (!r.success) {
       const code = r.error?.code || "";
+      const errorMsg = r.error?.message || "unknown error";
+      console.error(`[FCM] Failed to send to token ${idx}: ${code} - ${errorMsg}`);
       if (code.includes("registration-token-not-registered") || code.includes("invalid-argument")) {
         invalidTokens.push(tokens[idx]);
       }

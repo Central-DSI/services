@@ -95,16 +95,36 @@ async function main() {
         data: { guidanceDate: d },
       });
 
-      // Decide status by date (past => completed, future => scheduled)
+      // Decide status by date (past => accepted, future => requested/accepted randomly)
       const now = new Date();
       const isPast = d < now;
-      const status = isPast ? "completed" : "scheduled";
+      
+      let status;
+      let supervisorFeedback = null;
+      
+      if (isPast) {
+        // Past dates: 90% accepted, 10% rejected
+        status = Math.random() < 0.9 ? "accepted" : "rejected";
+        supervisorFeedback = status === "accepted" 
+          ? "Reviewed and noted." 
+          : "Schedule conflict, please reschedule.";
+      } else {
+        // Future dates: 70% accepted, 20% requested, 10% rejected
+        const rand = Math.random();
+        if (rand < 0.7) {
+          status = "accepted";
+          supervisorFeedback = "Approved";
+        } else if (rand < 0.9) {
+          status = "requested";
+          supervisorFeedback = null;
+        } else {
+          status = "rejected";
+          supervisorFeedback = "Cannot accommodate this time.";
+        }
+      }
 
       const studentNotes = `Guidance session ${i + 1}: progress discussion`;
-      const meetingUrl = makeMeetingUrl();
-
-      // For completed sessions, include supervisorFeedback
-      const supervisorFeedback = isPast ? "Reviewed and noted." : null;
+      const meetingUrl = status === "accepted" ? makeMeetingUrl() : null;
 
       await prisma.thesisGuidance.create({
         data: {

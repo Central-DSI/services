@@ -4,9 +4,14 @@ export const feedbackSchema = z.object({
   feedback: z.string().min(1, "feedback is required"),
 });
 
+export const rejectGuidanceSchema = z.object({
+  feedback: z.string().optional(),
+  message: z.string().optional(),
+});
+
 export const approveGuidanceSchema = z.object({
   feedback: z.string().optional(),
-  meetingUrl: z.string().url().optional(),
+  meetingUrl: z.string().url().optional().or(z.literal("")),
 });
 
 export const approveComponentsSchema = z.object({

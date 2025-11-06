@@ -47,7 +47,7 @@ export async function findMyStudents(lecturerId, roles) {
 	return result;
 }
 
-// List guidance requests assigned to this lecturer that are pending (scheduled without feedback)
+// List guidance requests assigned to this lecturer that are pending (requested status)
 export async function findGuidanceRequests(lecturerId, { page = 1, pageSize = 10 } = {}) {
 	const take = Math.max(1, Math.min(50, Number(pageSize) || 10));
 	const currentPage = Math.max(1, Number(page) || 1);
@@ -55,9 +55,7 @@ export async function findGuidanceRequests(lecturerId, { page = 1, pageSize = 10
 
 	const where = {
 		supervisorId: lecturerId,
-		status: "scheduled",
-		// consider both null and empty string as "no feedback yet" (pending)
-		OR: [{ supervisorFeedback: null }, { supervisorFeedback: "" }],
+		status: "requested",
 	};
 
 	const [total, rows] = await prisma.$transaction([
@@ -103,11 +101,27 @@ export async function approveGuidanceById(guidanceId, { feedback, meetingUrl } =
 	return prisma.thesisGuidance.update({
 		where: { id: guidanceId },
 		data: {
+			status: "accepted",
 			supervisorFeedback: feedback ?? "APPROVED",
 			meetingUrl: meetingUrl ?? undefined,
-			// keep status as scheduled; approval recorded via feedback
 		},
-		include: { thesis: true },
+		include: { 
+			thesis: { 
+				include: { 
+					student: { 
+						include: { 
+							user: true 
+						} 
+					} 
+				} 
+			},
+			schedule: true,
+			supervisor: { 
+				include: { 
+					user: true 
+				} 
+			}
+		},
 	});
 }
 
@@ -115,10 +129,26 @@ export async function rejectGuidanceById(guidanceId, { feedback } = {}) {
 	return prisma.thesisGuidance.update({
 		where: { id: guidanceId },
 		data: {
-			status: "cancelled",
+			status: "rejected",
 			supervisorFeedback: feedback ?? "REJECTED",
 		},
-		include: { thesis: true },
+		include: { 
+			thesis: { 
+				include: { 
+					student: { 
+						include: { 
+							user: true 
+						} 
+					} 
+				} 
+			},
+			schedule: true,
+			supervisor: { 
+				include: { 
+					user: true 
+				} 
+			}
+		},
 	});
 }
 

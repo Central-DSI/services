@@ -19,6 +19,9 @@ import {
   getThesisStatusMap,
   updateThesisStatusById,
 } from "../../repositories/thesisGuidance/lecturer.guidance.repository.js";
+import { createNotificationsForUsers } from "../notification.service.js";
+import { sendFcmToUsers } from "../push.service.js";
+import { formatDateTimeJakarta } from "../../utils/date.util.js";
 
 function ensureLecturer(lecturer) {
 	if (!lecturer) {
@@ -82,10 +85,40 @@ export async function rejectGuidanceService(userId, guidanceId, { feedback } = {
 		err.statusCode = 404;
 		throw err;
 	}
-	await rejectGuidanceById(guidanceId, { feedback });
+	const updated = await rejectGuidanceById(guidanceId, { feedback });
+	await logThesisActivity(updated.thesisId, userId, "GUIDANCE_REJECTED", feedback || undefined);
+	
+	// Send notification to student
+	try {
+		const studentUserId = updated.thesis?.student?.user?.id;
+		if (studentUserId) {
+			const lecturerName = updated.supervisor?.user?.fullName || "Dosen";
+			const scheduleDateStr = updated.schedule?.guidanceDate 
+				? formatDateTimeJakarta(new Date(updated.schedule.guidanceDate), { withDay: true })
+				: "";
+			const dateInfo = scheduleDateStr ? ` pada ${scheduleDateStr}` : "";
+			
+			await createNotificationsForUsers([studentUserId], {
+				title: "Bimbingan Ditolak",
+				message: `${lecturerName} menolak permintaan bimbingan${dateInfo}. Alasan: ${feedback || "Tidak disebutkan"}`,
+			});
+			
+			await sendFcmToUsers([studentUserId], {
+				title: "Bimbingan Ditolak",
+				body: `${lecturerName} menolak permintaan bimbingan${dateInfo}`,
+				data: {
+					type: "thesis-guidance:rejected",
+					guidanceId: guidanceId,
+					role: "student",
+				}
+			});
+		}
+	} catch (e) {
+		console.error("Failed to send rejection notification:", e?.message || e);
+	}
+	
 	// Re-read with includes for a complete, flat response
 	const fresh = await findGuidanceByIdForLecturer(guidanceId, lecturer.id);
-	await logThesisActivity(fresh.thesisId, userId, "GUIDANCE_REJECTED", feedback || undefined);
 	return { guidance: toFlatGuidance(fresh) };
 }
 
@@ -98,10 +131,41 @@ export async function approveGuidanceService(userId, guidanceId, { feedback, mee
 		err.statusCode = 404;
 		throw err;
 	}
-	await approveGuidanceById(guidanceId, { feedback, meetingUrl });
+	const updated = await approveGuidanceById(guidanceId, { feedback, meetingUrl });
+	await logThesisActivity(updated.thesisId, userId, "GUIDANCE_APPROVED", feedback || undefined);
+	
+	// Send notification to student
+	try {
+		const studentUserId = updated.thesis?.student?.user?.id;
+		if (studentUserId) {
+			const lecturerName = updated.supervisor?.user?.fullName || "Dosen";
+			const scheduleDateStr = updated.schedule?.guidanceDate 
+				? formatDateTimeJakarta(new Date(updated.schedule.guidanceDate), { withDay: true })
+				: "";
+			const dateInfo = scheduleDateStr ? ` pada ${scheduleDateStr}` : "";
+			const meetingInfo = meetingUrl ? `\nLink Meeting: ${meetingUrl}` : "";
+			
+			await createNotificationsForUsers([studentUserId], {
+				title: "Bimbingan Disetujui",
+				message: `${lecturerName} menyetujui permintaan bimbingan${dateInfo}${meetingInfo}`,
+			});
+			
+			await sendFcmToUsers([studentUserId], {
+				title: "Bimbingan Disetujui ✓",
+				body: `${lecturerName} menyetujui permintaan bimbingan${dateInfo}`,
+				data: {
+					type: "thesis-guidance:approved",
+					guidanceId: guidanceId,
+					role: "student",
+				}
+			});
+		}
+	} catch (e) {
+		console.error("Failed to send approval notification:", e?.message || e);
+	}
+	
 	// Re-read with includes for a complete, flat response
 	const fresh = await findGuidanceByIdForLecturer(guidanceId, lecturer.id);
-	await logThesisActivity(fresh.thesisId, userId, "GUIDANCE_APPROVED", feedback || undefined);
 	return { guidance: toFlatGuidance(fresh) };
 }
 

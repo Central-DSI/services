@@ -1,7 +1,7 @@
 import express from "express";
 import { authGuard, requireAnyRole } from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/validation.middleware.js";
-import { feedbackSchema, approveGuidanceSchema, approveComponentsSchema, failThesisSchema } from "../../validators/lecturer.guidance.validator.js";
+import { feedbackSchema, rejectGuidanceSchema, approveGuidanceSchema, approveComponentsSchema, failThesisSchema } from "../../validators/lecturer.guidance.validator.js";
 import {
 	myStudents,
 	listRequests,
@@ -27,7 +27,7 @@ router.use(authGuard, requireAnyRole(["pembimbing1", "pembimbing 1", "pembimbing
 
 router.get("/my-students", myStudents);
 router.get("/requests", listRequests);
-router.patch("/requests/:guidanceId/reject", validate(feedbackSchema), rejectGuidance);
+router.patch("/requests/:guidanceId/reject", validate(rejectGuidanceSchema), rejectGuidance);
 router.patch("/requests/:guidanceId/approve", validate(approveGuidanceSchema), approveGuidance);
 
 router.get("/progress", listProgress);

@@ -40,8 +40,10 @@ export async function listRequests(req, res, next) {
 export async function rejectGuidance(req, res, next) {
 	try {
 		const { guidanceId } = req.params;
-		const { feedback } = req.body || {};
-		const result = await rejectGuidanceService(req.user.sub, guidanceId, { feedback });
+		// Support both 'feedback' and 'message' from frontend
+		const { feedback, message } = req.body || {};
+		const feedbackText = feedback || message || undefined;
+		const result = await rejectGuidanceService(req.user.sub, guidanceId, { feedback: feedbackText });
 		res.json({ success: true, ...result });
 	} catch (err) {
 		next(err);

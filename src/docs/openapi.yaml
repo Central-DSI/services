@@ -23,6 +23,8 @@ tags:
     description: Admin-only utilities and maintenance endpoints
   - name: Notification
     description: Notification management and FCM token endpoints
+  - name: Calendar
+    description: Calendar and event management endpoints
   - name: LecturerThesisGuidance
     description: Lecturer-side thesis guidance endpoints
   - name: StudentThesisGuidance
@@ -131,6 +133,15 @@ paths:
 
   "/notification/fcm/unregister":
     $ref: "./notification/swagger-notification.yaml#/notification_fcm_unregister"
+
+  "/calendar/my-events":
+    $ref: "./calendar/swagger-calendar.yaml#/paths/~1calendar~1my-events"
+
+  "/calendar/upcoming":
+    $ref: "./calendar/swagger-calendar.yaml#/paths/~1calendar~1upcoming"
+
+  "/calendar/statistics":
+    $ref: "./calendar/swagger-calendar.yaml#/paths/~1calendar~1statistics"
 
   "/thesisGuidance/lecturer/my-students":
     $ref: "./thesisGuidance/lecturer.yaml#/lecturer_my_students"

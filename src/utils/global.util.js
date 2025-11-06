@@ -1,4 +1,22 @@
 /**
+ * Convert a name string to Title Case format.
+ * Example: "NABIL RIZKI NAVISA" -> "Nabil Rizki Navisa"
+ * Example: "husnii kamil" -> "Husnii Kamil"
+ *
+ * @param {string} input - Name string to convert
+ * @returns {string} Name in Title Case format
+ */
+export function toTitleCaseName(input) {
+	if (!input) return "-";
+	const s = String(input).trim().toLowerCase();
+	if (!s) return "-";
+	return s
+		.split(/\s+/)
+		.map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+		.join(" ");
+}
+
+/**
  * Derive enrollment year from NIM by reading the first two digits.
  * Example: NIM 2211522018 -> 2022.
  *

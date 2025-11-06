@@ -19,6 +19,7 @@ import prisma from "../../config/prisma.js";
 import { sendFcmToUsers } from "../../services/push.service.js";
 import { createNotificationsForUsers } from "../notification.service.js";
 import { formatDateTimeJakarta } from "../../utils/date.util.js";
+import { toTitleCaseName } from "../../utils/global.util.js";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
@@ -166,8 +167,33 @@ export async function getGuidanceDetailService(userId, guidanceId) {
 }
 
 export async function requestGuidanceService(userId, guidanceDate, studentNotes, file, meetingUrl, supervisorId) {
-  let { thesis } = await getActiveThesisOrThrow(userId);
+  let { student, thesis } = await getActiveThesisOrThrow(userId);
   thesis = await ensureThesisAcademicYear(thesis);
+  
+  // Get student name for notifications - convert to Title Case
+  const studentUser = await prisma.user.findUnique({ where: { id: userId } });
+  const studentName = toTitleCaseName(studentUser?.fullName || "Mahasiswa");
+  
+  // Check if there's any pending request (status: requested)
+  const pendingRequest = await prisma.thesisGuidance.findFirst({
+    where: {
+      thesisId: thesis.id,
+      status: "requested",
+    },
+    include: {
+      schedule: true,
+    },
+  });
+  
+  if (pendingRequest) {
+    const dateStr = pendingRequest?.schedule?.guidanceDate 
+      ? formatDateTimeJakarta(new Date(pendingRequest.schedule.guidanceDate), { withDay: true })
+      : "belum ditentukan";
+    const err = new Error(`Anda masih memiliki pengajuan bimbingan yang belum direspon oleh dosen (jadwal: ${dateStr}). Tunggu hingga dosen menyetujui atau menolak pengajuan sebelumnya.`);
+    err.statusCode = 400;
+    throw err;
+  }
+  
   const supervisors = await getSupervisorsForThesis(thesis.id);
   const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, "");
   const sup1 = supervisors.find((p) => norm(p.role?.name) === "pembimbing1");
@@ -197,7 +223,7 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
     studentNotes: studentNotes || `Request guidance on ${guidanceDate.toISOString()}`,
     supervisorFeedback: "",
     meetingUrl: meetingUrl || "",
-    status: "scheduled",
+    status: "requested",
   });
 
   await logThesisActivity(thesis.id, userId, "request-guidance", `Requested at ${guidanceDate.toISOString()}`);
@@ -209,7 +235,7 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
       (guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate));
     await createNotificationsForUsers(supervisorsUserIds, {
       title: "Permintaan bimbingan baru",
-      message: `Mahasiswa mengajukan bimbingan. Jadwal: ${dateStr}`,
+      message: `${studentName} mengajukan bimbingan. Jadwal: ${dateStr}`,
     });
   } catch (e) {
     console.warn("Notify (DB) failed (guidance request):", e?.message || e);
@@ -230,7 +256,7 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
     };
     await sendFcmToUsers(supUserIds, {
       title: "Permintaan bimbingan baru",
-      body: `Mahasiswa mengajukan bimbingan. Jadwal: ${
+      body: `${studentName} mengajukan bimbingan. Jadwal: ${
         data.scheduledAtFormatted || formatDateTimeJakarta(guidanceDate, { withDay: true }) || "-"
       }`,
       data,
@@ -289,14 +315,19 @@ export async function requestGuidanceService(userId, guidanceDate, studentNotes,
 export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate, studentNotes) {
   const student = await getStudentByUserId(userId);
   ensureStudent(student);
+  
+  // Get student name for notifications - convert to Title Case
+  const studentUser = await prisma.user.findUnique({ where: { id: userId } });
+  const studentName = toTitleCaseName(studentUser?.fullName || "Mahasiswa");
+  
   const guidance = await getGuidanceByIdForStudent(guidanceId, student.id);
   if (!guidance) {
     const err = new Error("Guidance not found for this student");
     err.statusCode = 404;
     throw err;
   }
-  if (guidance.status === "completed" || guidance.status === "cancelled") {
-    const err = new Error("Cannot reschedule a completed or cancelled guidance");
+  if (guidance.status === "accepted" || guidance.status === "rejected") {
+    const err = new Error("Cannot reschedule an accepted or rejected guidance");
     err.statusCode = 400;
     throw err;
   }
@@ -316,10 +347,10 @@ export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate
   try {
     const supervisors = await getSupervisorsForThesis(guidance.thesisId);
     const supervisorsUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
-    const dateStr = guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate);
+    const dateStr = formatDateTimeJakarta(guidanceDate, { withDay: true }) || (guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate));
     await createNotificationsForUsers(supervisorsUserIds, {
       title: "Jadwal bimbingan dijadwalkan ulang",
-      message: `Mahasiswa menjadwalkan ulang bimbingan ke ${dateStr}`,
+      message: `${studentName} menjadwalkan ulang bimbingan ke ${dateStr}`,
     });
     await createNotificationsForUsers([userId], {
       title: "Bimbingan dijadwalkan ulang",
@@ -328,19 +359,25 @@ export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate
   } catch (e) {
     console.warn("Notify (DB) failed (reschedule):", e?.message || e);
   }
-  // FCM notify all supervisors + student
+  // FCM notify supervisors only (student uses local toast)
   try {
     const supervisors = await getSupervisorsForThesis(guidance.thesisId);
     const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const dateFormatted = formatDateTimeJakarta(guidanceDate, { withDay: true }) || (guidanceDate instanceof Date ? guidanceDate.toISOString() : String(guidanceDate));
     const data = {
       type: "thesis-guidance:rescheduled",
       role: "supervisor",
       guidanceId: String(guidance.id),
       thesisId: String(guidance.thesisId),
       scheduledAt: new Date(guidanceDate).toISOString(),
+      scheduledAtFormatted: dateFormatted,
     };
-    await sendFcmToUsers(supUserIds, { title: "Jadwal bimbingan diubah", body: "Jadwal baru tersedia", data });
-    await sendFcmToUsers([userId], { title: "Bimbingan dijadwalkan ulang", body: "Jadwal baru tersedia", data: { ...data, role: "student" } });
+    await sendFcmToUsers(supUserIds, { 
+      title: "Jadwal bimbingan dijadwalkan ulang", 
+      body: `${studentName} menjadwalkan ulang bimbingan ke ${dateFormatted}`, 
+      data 
+    });
+    // Student notification removed - frontend shows local toast instead
   } catch (e) {
     console.warn("FCM notify failed (guidance reschedule):", e?.message || e);
   }
@@ -364,70 +401,40 @@ export async function rescheduleGuidanceService(userId, guidanceId, guidanceDate
 export async function cancelGuidanceService(userId, guidanceId, reason) {
   const student = await getStudentByUserId(userId);
   ensureStudent(student);
+  
   const guidance = await getGuidanceByIdForStudent(guidanceId, student.id);
   if (!guidance) {
     const err = new Error("Guidance not found for this student");
     err.statusCode = 404;
     throw err;
   }
-  if (guidance.status === "completed" || guidance.status === "cancelled") {
-    const err = new Error("Cannot cancel this guidance");
+  
+  // Only allow canceling "requested" status
+  if (guidance.status !== "requested") {
+    const err = new Error("Can only cancel pending guidance requests");
     err.statusCode = 400;
     throw err;
   }
-  const updated = await updateGuidanceById(guidance.id, { status: "cancelled", studentNotes: reason || guidance.studentNotes || "" });
-  await logThesisActivity(guidance.thesisId, userId, "cancel-guidance", reason || "");
-  // Persist notifications
-  try {
-    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
-    const supervisorsUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
-    await createNotificationsForUsers(supervisorsUserIds, {
-      title: "Bimbingan dibatalkan",
-      message: `Mahasiswa membatalkan bimbingan. Alasan: ${reason || "-"}`,
-    });
-    await createNotificationsForUsers([userId], {
-      title: "Bimbingan dibatalkan",
-      message: `Pengajuan bimbingan dibatalkan. ${reason ? "Alasan: " + reason : ""}`,
-    });
-  } catch (e) {
-    console.warn("Notify (DB) failed (cancel):", e?.message || e);
-  }
-  // FCM notify all supervisors + student
-  try {
-    const supervisors = await getSupervisorsForThesis(guidance.thesisId);
-    const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
-    const data = {
-      type: "thesis-guidance:cancelled",
-      role: "supervisor",
-      guidanceId: String(guidance.id),
-      thesisId: String(guidance.thesisId),
-      reason: String(reason || ""),
-    };
-    await sendFcmToUsers(supUserIds, { title: "Bimbingan dibatalkan", body: reason || "", data });
-    await sendFcmToUsers([userId], { title: "Bimbingan dibatalkan", body: reason || "", data: { ...data, role: "student" } });
-  } catch (e) {
-    console.warn("FCM notify failed (guidance cancel):", e?.message || e);
-  }
-  const flat = {
-    id: updated.id,
-    status: updated.status,
-    scheduledAt: updated?.schedule?.guidanceDate || null,
-    scheduledAtFormatted: updated?.schedule?.guidanceDate ? formatDateTimeJakarta(updated.schedule.guidanceDate, { withDay: true }) : null,
-    schedule: updated?.schedule
-      ? { id: updated.schedule.id, guidanceDate: updated.schedule.guidanceDate, guidanceDateFormatted: formatDateTimeJakarta(updated.schedule.guidanceDate, { withDay: true }) }
-      : null,
-    supervisorId: updated.supervisorId || null,
-    supervisorName: null,
-    meetingUrl: updated.meetingUrl || null,
-    notes: updated.studentNotes || null,
-    supervisorFeedback: updated.supervisorFeedback || null,
-  };
-  return { guidance: flat };
+  
+  // Log activity before deleting
+  await logThesisActivity(guidance.thesisId, userId, "delete-guidance-request", reason || "");
+  
+  // Delete the guidance record (no notifications needed)
+  await prisma.thesisGuidance.delete({
+    where: { id: guidance.id }
+  });
+  
+  return { success: true, message: "Guidance request deleted successfully" };
 }
 
 export async function updateStudentNotesService(userId, guidanceId, studentNotes) {
   const student = await getStudentByUserId(userId);
   ensureStudent(student);
+  
+  // Get student name for notifications - convert to Title Case
+  const studentUser = await prisma.user.findUnique({ where: { id: userId } });
+  const studentName = toTitleCaseName(studentUser?.fullName || "Mahasiswa");
+  
   const guidance = await getGuidanceByIdForStudent(guidanceId, student.id);
   if (!guidance) {
     const err = new Error("Guidance not found for this student");
@@ -443,7 +450,7 @@ export async function updateStudentNotesService(userId, guidanceId, studentNotes
     const preview = (studentNotes || "").slice(0, 120);
     await createNotificationsForUsers(supervisorsUserIds, {
       title: "Catatan mahasiswa diperbarui",
-      message: preview ? `Catatan baru: ${preview}` : "Catatan mahasiswa diperbarui",
+      message: preview ? `${studentName} memperbarui catatan: ${preview}` : `${studentName} memperbarui catatan bimbingan`,
     });
     await createNotificationsForUsers([userId], {
       title: "Catatan diperbarui",
@@ -456,6 +463,7 @@ export async function updateStudentNotesService(userId, guidanceId, studentNotes
   try {
     const supervisors = await getSupervisorsForThesis(guidance.thesisId);
     const supUserIds = supervisors.map((p) => p?.lecturer?.user?.id).filter(Boolean);
+    const preview = (studentNotes || "").slice(0, 100);
     const data = {
       type: "thesis-guidance:notes-updated",
       role: "supervisor",
@@ -463,8 +471,16 @@ export async function updateStudentNotesService(userId, guidanceId, studentNotes
       thesisId: String(guidance.thesisId),
       notes: String(studentNotes || ""),
     };
-    await sendFcmToUsers(supUserIds, { title: "Catatan mahasiswa diperbarui", body: studentNotes || "", data });
-    await sendFcmToUsers([userId], { title: "Catatan diperbarui", body: studentNotes || "", data: { ...data, role: "student" } });
+    await sendFcmToUsers(supUserIds, { 
+      title: "Catatan mahasiswa diperbarui", 
+      body: preview ? `${studentName}: ${preview}${studentNotes.length > 100 ? '...' : ''}` : `${studentName} memperbarui catatan`, 
+      data 
+    });
+    await sendFcmToUsers([userId], { 
+      title: "Catatan diperbarui", 
+      body: preview ? `${preview}${studentNotes.length > 100 ? '...' : ''}` : "Catatan berhasil diperbarui", 
+      data: { ...data, role: "student" } 
+    });
   } catch (e) {
     console.warn("FCM notify failed (notes updated):", e?.message || e);
   }
